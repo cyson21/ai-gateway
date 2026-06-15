@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Gateway Console</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Primary navigation">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M4 12h4l2-6 4 12 2-6h4" /></svg>
+          </span>
+          <span>AI Gateway</span>
+        </div>
+        <nav class="nav-list">
+          <button class="nav-item is-active" data-route="console">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h7" /></svg>
+            </span>
+            Gateway Console
+          </button>
+          <button class="nav-item" data-route="usage">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M5 19V9m7 10V5m7 14v-7" /></svg>
+            </span>
+            Usage &amp; Cost
+          </button>
+          <button class="nav-item" data-route="trace">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M6 5h12M6 12h12M6 19h12" /></svg>
+            </span>
+            Request Trace
+          </button>
+        </nav>
+        <div class="sidebar-status">
+          <span class="status-dot"></span>
+          Local fake providers
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div>
+            <h1 id="page-title">Gateway Console</h1>
+            <p id="page-subtitle">Route, cache, stream, and inspect requests through the MVP pipeline.</p>
+          </div>
+          <div class="topbar-controls">
+            <label class="select-label">
+              Environment
+              <select id="environment-select">
+                <option>local</option>
+                <option>demo</option>
+              </select>
+            </label>
+            <div class="mode-control" aria-label="Pipeline mode">
+              <button data-mode="PASSTHROUGH">Passthrough</button>
+              <button data-mode="CACHE_ONLY">Cache</button>
+              <button data-mode="ROUTED">Routed</button>
+              <button data-mode="ROUTED_RESILIENT" class="is-active">Resilient</button>
+            </div>
+          </div>
+        </header>
+
+        <section class="metric-strip" id="metric-strip" aria-label="Gateway metrics"></section>
+
+        <section id="route-console" class="route-panel is-visible">
+          <div class="console-grid">
+            <section class="panel composer-panel" aria-labelledby="composer-title">
+              <div class="panel-heading">
+                <h2 id="composer-title">Request Composer</h2>
+                <span class="panel-hint">OpenAI-compatible payload</span>
+              </div>
+              <div class="form-grid">
+                <label>
+                  Tenant
+                  <input id="tenant-input" value="tenant-1" />
+                </label>
+                <label>
+                  Model alias
+                  <select id="alias-select">
+                    <option>gpt-4o</option>
+                    <option>cheap</option>
+                    <option>fast</option>
+                    <option>resilient</option>
+                  </select>
+                </label>
+              </div>
+              <label>
+                Prompt
+                <textarea id="prompt-input" rows="8">Explain how the gateway keeps quota, cache, fallback, and guardrail decisions observable.</textarea>
+              </label>
+              <div class="composer-actions">
+                <label class="toggle">
+                  <input id="stream-toggle" type="checkbox" checked />
+                  <span>Stream</span>
+                </label>
+                <label class="toggle">
+                  <input id="backend-toggle" type="checkbox" />
+                  <span>Use backend</span>
+                </label>
+                <button id="send-request" class="primary-action">Send request</button>
+              </div>
+              <div class="backend-settings">
+                <label>
+                  Backend URL
+                  <input id="backend-url" placeholder="http://localhost:8080" />
+                </label>
+                <label>
+                  API key
+                  <input id="api-key" placeholder="Bearer token" />
+                </label>
+              </div>
+            </section>
+
+            <section class="panel response-panel" aria-labelledby="response-title">
+              <div class="panel-heading">
+                <h2 id="response-title">Live Response</h2>
+                <span id="response-state" class="badge badge-info">fixture</span>
+              </div>
+              <div class="response-summary" id="response-summary"></div>
+              <ol class="stream-list" id="stream-list" aria-live="polite"></ol>
+            </section>
+          </div>
+        </section>
+
+        <section id="route-usage" class="route-panel">
+          <div class="usage-layout">
+            <section class="panel">
+              <div class="panel-heading">
+                <h2>Usage by Model</h2>
+                <span class="panel-hint">daily rollup fixture</span>
+              </div>
+              <div class="usage-bars" id="usage-bars"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-heading">
+                <h2>Cost Controls</h2>
+                <span class="badge badge-good">under budget</span>
+              </div>
+              <div class="budget-meter">
+                <div><span>Monthly token budget</span><strong>64%</strong></div>
+                <progress value="64" max="100"></progress>
+              </div>
+              <div class="budget-meter">
+                <div><span>Monthly cost budget</span><strong>39%</strong></div>
+                <progress value="39" max="100"></progress>
+              </div>
+              <div class="budget-meter">
+                <div><span>Fallback retry budget</span><strong>72%</strong></div>
+                <progress value="72" max="100"></progress>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section id="route-trace" class="route-panel">
+          <section class="panel trace-panel">
+            <div class="panel-heading">
+              <h2>Request Trace</h2>
+              <span class="panel-hint">latest request records</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Request</th>
+                    <th>Status</th>
+                    <th>Tenant</th>
+                    <th>Alias</th>
+                    <th>Provider</th>
+                    <th>Cache</th>
+                    <th>Guardrail</th>
+                    <th>Quota</th>
+                    <th>Latency</th>
+                  </tr>
+                </thead>
+                <tbody id="trace-body"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+      </main>
+    </div>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

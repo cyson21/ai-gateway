@@ -1,0 +1,62 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: ai_gateway
+      POSTGRES_USER: ai_gateway
+      POSTGRES_PASSWORD: ai_gateway
+    ports:
+      - "54329:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ai_gateway -d ai_gateway"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - ai_gateway_postgres:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "63799:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - ai_gateway_redis:/data
+
+  gateway:
+    build:
+      context: ../../backend
+    environment:
+      SPRING_R2DBC_URL: r2dbc:postgresql://postgres:5432/ai_gateway
+      SPRING_R2DBC_USERNAME: ai_gateway
+      SPRING_R2DBC_PASSWORD: ai_gateway
+      SPRING_FLYWAY_URL: jdbc:postgresql://postgres:5432/ai_gateway
+      SPRING_FLYWAY_USER: ai_gateway
+      SPRING_FLYWAY_PASSWORD: ai_gateway
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8080"
+
+  nginx:
+    image: nginx:1.27-alpine
+    depends_on:
+      - gateway
+    ports:
+      - "18080:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+
+volumes:
+  ai_gateway_postgres:
+  ai_gateway_redis:
