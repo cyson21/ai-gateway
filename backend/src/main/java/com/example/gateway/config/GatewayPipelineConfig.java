@@ -6,13 +6,17 @@ import java.util.Map;
 import java.util.Optional;
 
 import com.example.gateway.api.GatewayPipeline;
+import com.example.gateway.batch.BatchService;
+import com.example.gateway.batch.InMemoryBatchJobStore;
 import com.example.gateway.cache.DeterministicEmbeddingModel;
 import com.example.gateway.cache.ExactCache;
+import com.example.gateway.cache.InMemoryCacheInvalidationPolicy;
 import com.example.gateway.cache.InMemoryCacheStore;
 import com.example.gateway.cache.InMemorySemanticCacheStore;
 import com.example.gateway.cache.PgVectorSemanticCache;
 import com.example.gateway.cache.SemanticCache;
 import com.example.gateway.cache.TwoStageCache;
+import com.example.gateway.cache.VersionedSemanticCache;
 import com.example.gateway.guardrail.RuleBasedGuardrail;
 import com.example.gateway.observability.InMemoryRequestLogStore;
 import com.example.gateway.observability.RequestLogStore;
@@ -62,12 +66,14 @@ public class GatewayPipelineConfig {
         RuleBasedGuardrail guardrail = RuleBasedGuardrail.defaults(
                 List.of("forbidden", "blocked", "credential leak"), 8_000);
 
-        SemanticCache cache = new TwoStageCache(
-                new ExactCache(new InMemoryCacheStore()),
-                new PgVectorSemanticCache(
-                        new DeterministicEmbeddingModel(),
-                        new InMemorySemanticCacheStore(),
-                        0.82));
+        SemanticCache cache = new VersionedSemanticCache(
+                new TwoStageCache(
+                        new ExactCache(new InMemoryCacheStore()),
+                        new PgVectorSemanticCache(
+                                new DeterministicEmbeddingModel(),
+                                new InMemorySemanticCacheStore(),
+                                0.82)),
+                new InMemoryCacheInvalidationPolicy());
 
         Map<String, LlmProvider> providerMap = Map.of(
                 PRIMARY, new FakeLlmProvider(PRIMARY),
@@ -96,7 +102,15 @@ public class GatewayPipelineConfig {
         return new InMemoryRequestLogStore(System::currentTimeMillis);
     }
 
+    @Bean
+    public BatchService batchService(GatewayPipeline pipeline) {
+        return new BatchService(pipeline, new InMemoryBatchJobStore());
+    }
+
     private static RoutingStrategy strategyFor(String alias) {
+        if ("ab-test".equals(alias)) {
+            return RoutingStrategy.WEIGHTED_SPLIT;
+        }
         if ("cheap".equals(alias)) {
             return RoutingStrategy.LEAST_COST;
         }
@@ -122,6 +136,11 @@ public class GatewayPipelineConfig {
             return List.of(
                     new ModelCandidate(PRIMARY, "resilient-primary", 500L, 12L, true),
                     new ModelCandidate(FALLBACK, "resilient-fallback", 550L, 18L, true));
+        }
+        if ("ab-test".equals(alias)) {
+            return List.of(
+                    new ModelCandidate(PRIMARY, "ab-blue", 500L, 12L, true, 1),
+                    new ModelCandidate(FALLBACK, "ab-green", 500L, 12L, true, 1));
         }
         return List.of(new ModelCandidate(PRIMARY, model, 500L, 12L, true));
     }

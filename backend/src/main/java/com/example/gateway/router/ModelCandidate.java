@@ -9,8 +9,19 @@ package com.example.gateway.router;
  * @param costPerKTokens  declared cost per 1K tokens, in micro-units (deterministic, not live)
  * @param latencyMs       declared typical latency in milliseconds
  * @param healthy         whether the candidate is currently selectable
+ * @param trafficWeight   stable-routing weight for A/B splits; zero keeps the candidate as fallback only
  */
-public record ModelCandidate(String provider, String model, long costPerKTokens, long latencyMs, boolean healthy) {
+public record ModelCandidate(
+        String provider,
+        String model,
+        long costPerKTokens,
+        long latencyMs,
+        boolean healthy,
+        int trafficWeight) {
+
+    public ModelCandidate(String provider, String model, long costPerKTokens, long latencyMs, boolean healthy) {
+        this(provider, model, costPerKTokens, latencyMs, healthy, 1);
+    }
 
     public ModelCandidate {
         if (provider == null || provider.isBlank()) {
@@ -21,6 +32,9 @@ public record ModelCandidate(String provider, String model, long costPerKTokens,
         }
         if (costPerKTokens < 0 || latencyMs < 0) {
             throw new IllegalArgumentException("cost and latency must be non-negative");
+        }
+        if (trafficWeight < 0) {
+            throw new IllegalArgumentException("trafficWeight must be non-negative");
         }
     }
 

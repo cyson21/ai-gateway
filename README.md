@@ -6,11 +6,12 @@
 
 ## 상태
 
-MVP 범위는 M6 Demo까지 완료했습니다. 기본 실행은 fake provider, in-memory store, deterministic embedding을 사용해 비용 없이 재현되며, Redis/Testcontainers 통합 검증은 Docker daemon이 연결된 환경에서 별도로 실행합니다.
+MVP 범위는 M6 Demo까지 완료했고, 2026-06-17에 비-AWS Phase 2 local extension 4개(Model A/B routing, cache invalidation policy, tool-call passthrough, async batch endpoint)도 완료했습니다. 기본 실행은 fake provider, in-memory store, deterministic embedding을 사용해 비용 없이 재현됩니다.
 
 검증 기준:
 
 - Backend: `cd backend && MAVEN_OPTS="-Xmx512m" JAVA_HOME=$(/usr/libexec/java_home -v 23) mvn -B -o test -DargLine="-Xmx384m" -Dtest='!Redis*'`
+- Redis/Testcontainers: `cd backend && TESTCONTAINERS_DOCKERCONFIG_SOURCE=autoIgnoringUserProperties TESTCONTAINERS_RYUK_DISABLED=true TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock DOCKER_HOST=unix:///Users/chanyang.son/.colima/default/docker.sock env 'api.version=1.44' MAVEN_OPTS="-Xmx512m" JAVA_HOME=$(/usr/libexec/java_home -v 23) mvn -B -o test -DargLine="-Xmx384m" -Dtest='Redis*'`
 - Web demo: `cd web && npm run build && npm test`
 - Local infra draft: `docker compose -f infra/local/docker-compose.yml config`
 
@@ -37,6 +38,13 @@ CACHE_ONLY         semantic cache만 적용
 ROUTED             정책 라우팅 적용
 ROUTED_RESILIENT   라우팅 + 폴백 + retry budget
 ```
+
+## Phase 2 Local Extensions
+
+- `WEIGHTED_SPLIT` routing: `ab-test` alias uses deterministic prompt-bucketed A/B ordering while keeping fallback candidates.
+- Cache invalidation: tenant/alias versioning makes old exact/semantic entries unreachable after invalidation.
+- Tool-call passthrough: OpenAI-style `tools`/`tool_choice` requests reach the provider and return `tool_calls`.
+- Async batch endpoint: `/v1/batches/chat/completions`, `/v1/batches/{id}/process`, and `/v1/batches/{id}` provide a local queued batch path.
 
 ## 기술 스택
 

@@ -3,6 +3,7 @@ package com.example.gateway.web;
 import java.util.List;
 
 import com.example.gateway.provider.CompletionRequest;
+import com.example.gateway.provider.ToolDefinition;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
@@ -15,7 +16,13 @@ public record ChatCompletionRequest(
         @JsonProperty("model") String model,
         @JsonProperty("messages") List<Message> messages,
         @JsonProperty("max_tokens") Integer maxTokens,
-        @JsonProperty("stream") Boolean stream) {
+        @JsonProperty("stream") Boolean stream,
+        @JsonProperty("tools") List<ToolDefinition> tools,
+        @JsonProperty("tool_choice") String toolChoice) {
+
+    public ChatCompletionRequest(String model, List<Message> messages, Integer maxTokens, Boolean stream) {
+        this(model, messages, maxTokens, stream, List.of(), null);
+    }
 
     /** Default completion budget when the caller omits {@code max_tokens}. */
     static final int DEFAULT_MAX_TOKENS = 256;
@@ -34,7 +41,7 @@ public record ChatCompletionRequest(
         }
         int tokens = (maxTokens == null || maxTokens <= 0) ? DEFAULT_MAX_TOKENS : maxTokens;
         boolean streaming = stream != null && stream;
-        return new CompletionRequest(tenantId, model, flattenMessages(), tokens, streaming);
+        return new CompletionRequest(tenantId, model, flattenMessages(), tokens, streaming, tools, toolChoice);
     }
 
     /** Flatten chat turns into a single deterministic prompt: {@code role: content} per line. */

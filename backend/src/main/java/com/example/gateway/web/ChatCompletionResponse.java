@@ -7,6 +7,8 @@ import com.example.gateway.api.PipelineMode;
 import com.example.gateway.cache.CacheType;
 import com.example.gateway.observability.RequestRecord;
 import com.example.gateway.provider.CompletionResponse;
+import com.example.gateway.provider.ToolCall;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
  * Projection of the pipeline's {@link RequestRecord} returned from
@@ -31,7 +33,14 @@ public record ChatCompletionResponse(
     public record Choice(int index, Message message, String finishReason) {
     }
 
-    public record Message(String role, String content) {
+    public record Message(String role, String content, @JsonProperty("tool_calls") java.util.List<ToolCall> toolCalls) {
+        public Message(String role, String content) {
+            this(role, content, java.util.List.of());
+        }
+
+        public Message {
+            toolCalls = toolCalls == null ? java.util.List.of() : java.util.List.copyOf(toolCalls);
+        }
     }
 
     public record UsageView(int promptTokens, int completionTokens, int totalTokens) {
@@ -46,7 +55,9 @@ public record ChatCompletionResponse(
         CompletionResponse response = result.response();
         java.util.List<Choice> choices = response == null
                 ? java.util.List.of()
-                : java.util.List.of(new Choice(0, new Message("assistant", response.content()), "stop"));
+                : java.util.List.of(new Choice(0,
+                        new Message("assistant", response.content(), response.toolCalls()),
+                        response.hasToolCalls() ? "tool_calls" : "stop"));
         return new ChatCompletionResponse(
                 "chatcmpl-" + UUID.randomUUID(),
                 "chat.completion",

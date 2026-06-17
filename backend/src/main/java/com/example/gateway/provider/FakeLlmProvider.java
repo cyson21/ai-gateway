@@ -39,6 +39,16 @@ public final class FakeLlmProvider implements LlmProvider {
             throw new IllegalStateException("provider '" + name + "' is unhealthy");
         }
         int promptTokens = estimateTokens(request.prompt());
+        if (request.hasTools() && !"none".equalsIgnoreCase(request.toolChoice())) {
+            ToolDefinition tool = request.tools().get(0);
+            String arguments = "{\"query\":\"" + jsonString(request.prompt()) + "\"}";
+            ToolCall call = new ToolCall(
+                    "call_" + Math.abs((tool.function().name() + request.prompt()).hashCode()),
+                    "function",
+                    new ToolCall.FunctionCall(tool.function().name(), arguments));
+            int completionTokens = Math.min(request.maxTokens(), Math.max(1, estimateTokens(arguments)));
+            return new CompletionResponse("", model, new Usage(promptTokens, completionTokens), java.util.List.of(call));
+        }
         String content = "[" + name + ":" + model + "] echo: " + request.prompt();
         int completionTokens = Math.min(request.maxTokens(), estimateTokens(content));
         return new CompletionResponse(content, model, new Usage(promptTokens, completionTokens));
@@ -50,5 +60,13 @@ public final class FakeLlmProvider implements LlmProvider {
             return 0;
         }
         return Math.max(1, text.length() / 4);
+    }
+
+    private static String jsonString(String value) {
+        return value.replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t");
     }
 }

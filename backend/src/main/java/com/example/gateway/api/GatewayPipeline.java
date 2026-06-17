@@ -93,7 +93,7 @@ public final class GatewayPipeline {
         }
 
         RoutingPlan plan = aliasResolver.resolve(request.tenantId(), request.alias());
-        List<ModelCandidate> ordered = router.order(plan.strategy(), plan.candidates());
+        List<ModelCandidate> ordered = router.order(plan.strategy(), plan.candidates(), request);
         if (ordered.isEmpty()) {
             return new GatewayResult(
                     failed(request, mode, 0, "no healthy candidate for alias '" + request.alias() + "'", elapsed(start)),

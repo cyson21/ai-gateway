@@ -20,6 +20,8 @@ static demo console.
 - Streaming: OpenAI-compatible SSE chunk projection with final usage reconciliation is covered.
 - Observability: request log rows and usage rollups are covered by deterministic aggregation tests.
 - Eval: golden request set and mode-comparison report generation are covered.
+- Phase 2 local extensions: weighted A/B routing, cache invalidation, tool-call passthrough, and async
+  batch processing are covered.
 - Demo: dependency-free web console with Gateway Console, Usage & Cost, and Request Trace views.
 
 ## How To Demo Locally
@@ -46,5 +48,6 @@ or send requests to a local backend by enabling the backend toggle and setting t
 ## Current Boundaries
 
 - Default runtime uses fake providers, in-memory stores, and deterministic embeddings.
-- Redis-backed store tests exist, but live Redis/Testcontainers verification requires a running Docker daemon.
-- OpenAI/Anthropic live transports, admin CRUD APIs, and Phase 2 routing experiments are intentionally parked.
+- Redis-backed store tests pass with local Colima/Testcontainers when Docker is running.
+- OpenAI/Anthropic live transports, admin CRUD APIs, actual AWS resources, and payment flows are outside
+  the local completion scope.

@@ -7,5 +7,7 @@ public enum RoutingStrategy {
     /** Lowest declared cost among healthy candidates; ties broken deterministically. */
     LEAST_COST,
     /** Lowest declared latency among healthy candidates; ties broken deterministically. */
-    LEAST_LATENCY
+    LEAST_LATENCY,
+    /** Stable request-bucketed split for A/B model routing. */
+    WEIGHTED_SPLIT
 }
