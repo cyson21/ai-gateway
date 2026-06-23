@@ -132,6 +132,7 @@ mvn -B -o test -DargLine="-Xmx384m" -Dtest='Redis*'
 | Redis/Testcontainers | `mvn -B -o test -Dtest='Redis*'` with Colima env | Docker daemon 필요 |
 | Web demo | `cd web && npm run build && npm test` | static console 검증 |
 | Local infra draft | `docker compose -f infra/local/docker-compose.yml config` | compose 문법 검증 |
+| 문서 경계 | `docs/portfolio-one-pager.md`, `README.md` | fake/local-first와 provider-backed 범위 분리 |
 
 ## 운영/배포
 
@@ -158,7 +159,7 @@ mvn -B -o test -DargLine="-Xmx384m" -Dtest='Redis*'
 backend/   Spring Boot WebFlux gateway
 web/       dependency-free static demo console
 infra/     local Docker Compose draft
-docs/      design, plans, ADR, project tracking
+docs/      public portfolio docs and runbooks
 ```
 
 ## 문서 읽는 순서
@@ -166,6 +167,7 @@ docs/      design, plans, ADR, project tracking
 | 순서 | 문서 | 목적 |
 |---|---|---|
 | 1 | [Portfolio One-Pager](docs/portfolio-one-pager.md) | 포트폴리오 요약과 경계 |
+| 2 | [README](README.md) | 실행, 검증, 구현 API 기준 |
 
 ## 범위 밖
 

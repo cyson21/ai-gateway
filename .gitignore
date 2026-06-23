@@ -1,0 +1,33 @@
+# Build output
+backend/target/
+web/dist/
+web/node_modules/
+web/qa/
+node_modules/
+
+# Local env
+.env
+.env.local
+*.local
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+
+# Logs
+*.log
+
+# Private local docs and agent run records
+.ai-runs/
+docs/internal/
+docs/superpowers/
+docs/reviews/
+docs/portfolio/interview-guide.md
+docs/portfolio-interview-guide.md
+docs/next-agent-bootstrap.md
+docs/project-tracking.md
+TODO.md
