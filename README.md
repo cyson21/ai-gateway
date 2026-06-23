@@ -1,12 +1,18 @@
 # AI Gateway
 
-여러 LLM provider 앞단에 서서 인증, 라우팅, 폴백, semantic cache, 테넌트별 토큰 예산, rate limit, 가드레일, 비용·지연 관측을 책임지는 LLM 오케스트레이션 인프라 백엔드입니다.
+AI Gateway는 여러 LLM 연동 흐름을 하나의 OpenAI 호환 인터페이스로 묶어 테스트하기 위한 로컬 우선 게이트웨이 프로젝트입니다. 기본 실행은 `fake provider` + `in-memory/local-first deterministic runtime`으로 동작하며, 비용 없는 재현형 데모를 우선합니다.
 
-애플리케이션은 provider SDK 대신 gateway의 OpenAI 호환 인터페이스 하나만 바라보고, provider 선택·폴백·캐시·예산·관측은 gateway가 책임집니다.
+프로젝트는 구현 범위를 좁혀 문서화하고 있어, 실제 동작 API는 아래 4개입니다.
+
+- `POST /v1/chat/completions`
+- `POST /v1/batches/chat/completions`
+- `POST /v1/batches/{id}/process`
+- `GET /v1/batches/{id}`
 
 ## 상태
 
-MVP 범위는 M6 Demo까지 완료했고, 2026-06-17에 비-AWS Phase 2 local extension 4개(Model A/B routing, cache invalidation policy, tool-call passthrough, async batch endpoint)도 완료했습니다. 기본 실행은 fake provider, in-memory store, deterministic embedding을 사용해 비용 없이 재현됩니다.
+MVP는 M6 Demo 완성 기준으로 정리되어 있고, 2026-06-17에 local extension 4개(Model A/B routing, cache invalidation policy, tool-call passthrough, async batch endpoint)도 확인했습니다.
+기본 런타임은 `fake provider`, `in-memory store`, deterministic embedding으로 고정되어 있어 외부 의존 없이 재현 가능합니다.
 
 검증 기준:
 
@@ -50,10 +56,11 @@ ROUTED_RESILIENT   라우팅 + 폴백 + retry budget
 
 - Java 21, Maven, Spring Boot 3 (WebFlux)
 - PostgreSQL + pgvector, Flyway
-- Redis (rate limit window, exact cache, 예산 원자 차감)
 - Dependency-free static web console (Gateway Console / Usage & Cost / Request Trace)
-- Docker Compose, Testcontainers
-- 기본 provider/embedding은 fake, 실 provider는 opt-in
+- Docker Compose
+- 기본 runtime은 fake provider와 deterministic embedding + in-memory cache/지표 store
+- Redis/Testcontainers는 기본 runtime 밖의 선택형 검증 경로
+- 외부 provider 연동, 외부 비용 정산 연동은 범위 밖
 
 ## 레이아웃
 
