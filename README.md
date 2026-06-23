@@ -61,7 +61,7 @@ ROUTED_RESILIENT   라우팅 + 폴백 + retry budget
 backend/   Spring Boot WebFlux gateway
 web/       static demo console (Gateway Console / Usage & Cost / Request Trace)
 infra/     local Docker Compose (PostgreSQL+pgvector, Redis, Nginx)
-docs/      design, plans, ADR, project tracking
+docs/      public portfolio docs and runbooks
 ```
 
 ## 문서
