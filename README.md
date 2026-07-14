@@ -1,140 +1,153 @@
 # AI Gateway
 
-AI Gateway는 여러 LLM 연동 흐름을 하나의 OpenAI 호환 API로 제공하는 Spring Boot gateway 프로젝트입니다. 기본 실행은 테스트용 provider, 메모리 저장소, 고정된 embedding 결과를 사용해 외부 비용 없이 라우팅, 캐시, 폴백, 예산 제어를 재현합니다.
+AI Gateway는 LLM 요청 앞단의 인증, 사용량 제한, 캐시, 라우팅, 폴백, 가드레일, 요청 기록을 하나의 파이프라인으로 구성한 Java 21·Spring Boot WebFlux 프로젝트입니다. HTTP 계층은 OpenAI Chat Completions의 일부 요청·응답 형식과 로컬 배치 API를 구현합니다. 기본 런타임은 테스트용 제공자와 메모리 저장소를 사용하며 실제 OpenAI·Anthropic 호출이나 실제 과금 연동은 포함하지 않습니다.
 
-## 프로젝트 요약
+## 한눈에 보기
 
 | 항목 | 내용 |
 |---|---|
-| 해결하려는 문제 | 애플리케이션마다 provider SDK, 폴백, 비용·token 예산, 캐시, 가드레일을 따로 구현하면 운영 기준이 흩어짐 |
-| 주요 기술 | Java 21, Spring Boot WebFlux, OpenAI 호환 API, 라우팅·폴백, semantic cache, quota, 정적 데모 |
-| 주요 기능 | OpenAI 호환 API, 요청 처리 단계, semantic cache, quota·폴백, 요청 기록 |
-| 확인 방법 | 백엔드 로컬 회귀 테스트, Redis/Testcontainers 선택 테스트, 정적 웹 데모 테스트 |
-| 빠른 실행 | web은 `cd web && npm run build && npm test`, backend는 Maven 로컬 테스트 실행 |
-| 제한 사항 | 실제 LLM provider, 관리자 정책 API, AWS 운영 환경, 실제 과금 기능은 포함하지 않음 |
-
-## 주요 내용
-
-| 주제 | 관련 문서와 코드 | 설명 |
-|---|---|---|
-| OpenAI 호환 API | [구현 API](#구현-api), [ChatCompletionControllerTest](backend/src/test/java/com/example/gateway/web/ChatCompletionControllerTest.java) | `/v1/chat/completions`와 batch API의 요청 형식 |
-| 캐시·예산·폴백 | [비교 모드](#비교-모드), 관련 테스트 | 요청 처리 단계에서 캐시, 예산, 폴백이 각각 어떻게 작동하는지 설명 |
-| 정적 데모 | [정적 데모 검사 도구](web/scripts/verify-static-demo.mjs) | 외부 provider 없이 콘솔 화면과 요청 기록 예제가 빌드되는지 확인 |
-
-## 주요 코드와 테스트
-
-| 구분 | 코드 또는 기능 | 테스트 또는 실행 방법 |
-|---|---|---|
-| OpenAI 호환 API와 batch | `/v1/chat/completions`, `/v1/batches/*` | [ChatCompletionControllerTest](backend/src/test/java/com/example/gateway/web/ChatCompletionControllerTest.java) |
-| 두 단계 캐시와 tenant 예산 | exact·semantic cache, quota guard | [TwoStageCacheTest](backend/src/test/java/com/example/gateway/cache/TwoStageCacheTest.java), [SlidingWindowQuotaGuardBudgetTest](backend/src/test/java/com/example/gateway/quota/SlidingWindowQuotaGuardBudgetTest.java) |
-| 실패 복구 | retry budget, circuit breaker, 후보 provider 폴백 | [FallbackChainTest](backend/src/test/java/com/example/gateway/resilience/FallbackChainTest.java), `ROUTED_RESILIENT` 모드 |
-
-## 실행 환경
-
-| 구분 | 준비 사항 | 확인할 내용 |
-|---|---|---|
-| 기본 백엔드 | JDK와 Maven cache | 테스트용 provider 기반 로컬 회귀 테스트 |
-| 기본 web | Node와 npm | 정적 콘솔 빌드와 테스트 |
-| Redis 연동 | Docker 또는 Colima, Redis Testcontainers | Redis 캐시 통합 테스트이며 실제 provider 과금·운영 연동은 아님 |
-
-## 구현 결과
-
-| 구현 내용 | 결과 | 확인 방법 |
-|---|---|---|
-| OpenAI 호환 API | `/v1/chat/completions`와 batch API 3종 구현 | 백엔드 로컬 테스트 |
-| 요청 처리 단계 | auth, quota, guardrail, cache, router, dispatch, fallback, record 순서 구성 | 처리 단계 테스트 |
-| 캐시와 라우팅 비교 | exact·semantic cache와 고정된 A/B·폴백 모드 제공 | Phase 2 로컬 확장 테스트 |
-| 비용 없는 데모 | 테스트용 provider와 정적 웹 콘솔로 라우팅과 요청 기록 재현 | `web/scripts/verify-static-demo.mjs` |
-
-## 프로젝트 배경
-
-Enterprise Policy RAG가 하나의 RAG 애플리케이션이라면, AI Gateway는 여러 AI 애플리케이션이 공통으로 사용하는 LLM 연결 계층입니다. 클라이언트는 OpenAI 호환 API만 호출하고, gateway가 인증, 라우팅, 캐시, 폴백, 비용·token 예산, 가드레일, 요청 기록을 처리합니다.
-
-## 주요 설계
-
-| 설계 | 선택 이유 | 구현과 테스트 |
-|---|---|---|
-| OpenAI 호환 API | 클라이언트 변경 없이 gateway의 공통 정책을 적용하기 위함 | `/v1/chat/completions` API 테스트 |
-| 테스트용 provider 기본값 | 실제 LLM 비용 없이 요청 처리 흐름을 반복 테스트하기 위함 | 백엔드 로컬 회귀 테스트 |
-| semantic cache | 유사 요청의 비용과 지연을 줄이기 위함 | 캐시 테스트, 정적 데모 |
-| 폴백과 retry budget | provider 실패를 애플리케이션마다 따로 처리하지 않기 위함 | `ROUTED_RESILIENT` 모드 테스트 |
+| 문제 | 애플리케이션마다 흩어지는 인증, 사용량 제한, 캐시, 라우팅, 장애 복구 기준을 공통 처리 단계에 모음 |
+| 지원 요청 필드 | `model`, `messages[].role/content`, `max_tokens`, `stream`, `tools`, `tool_choice` |
+| 구현 API | Chat Completions 1개, 로컬 배치 접수·실행·조회 3개 |
+| 기본 실행 | Java 21, 테스트용 LLM 제공자, 결정론적 임베딩, 메모리 사용량 제한·캐시·요청 기록 |
+| 선택 검증 | Redis Testcontainers, PostgreSQL·Redis·Nginx Compose 설정 검사 |
+| 검증 방식 | Maven 단위·슬라이스 테스트, Redis 통합 테스트, 정적 웹 콘솔 빌드·검사 |
+| 주요 경계 | 실제 LLM, 실제 모델 임베딩, 통화 단위 비용, 운영 배포와 성능 수치는 구현하지 않음 |
 
 ## 아키텍처
 
 ```text
-요청 수신 (/v1/chat/completions)
--> Auth (API key -> tenant)
--> Quota (rate limit + token/cost budget)
--> Guardrail(in)
--> Cache (exact -> semantic)
--> Router (model alias -> provider/model candidates)
--> Dispatch (테스트용 provider 기본)
--> Fallback (retry budget + circuit breaker)
--> Guardrail(out) + usage aggregation
--> Record (token/latency/cost/cache/fallback)
+HTTP 요청
+  -> Bearer API key 해시 조회 -> tenant 식별
+  -> Chat Completions 일부 형식 -> 내부 CompletionRequest
+  -> 사용량 제한: 요청 수 + 토큰/로컬 비용 단위 예산
+  -> 입력 가드레일
+  -> 2단계 캐시
+     - exact: tenant + model alias + 정규화 프롬프트의 SHA-256
+     - similarity: 결정론적 영문·숫자 토큰 벡터 + cosine threshold
+  -> model alias 해석
+  -> fixed / least-cost / least-latency / 프롬프트 해시 기반 가중 분배
+  -> 테스트용 제공자 호출
+  -> circuit breaker + retry budget + 후보 폴백
+  -> 출력 가드레일
+  -> 사용량·지연·캐시·폴백 결과 기록
+  -> JSON 응답 또는 완료 응답을 SSE 청크로 투영
 ```
 
-기본 provider와 embedding은 항상 같은 결과를 반환하는 테스트용 구현입니다. 요청 처리 단계와 기록 기능을 비용 없이 테스트하며, 실제 provider 호출은 별도 연동 작업으로 남겨 둡니다.
+[기본 파이프라인 구성](backend/src/main/java/com/example/gateway/config/GatewayPipelineConfig.java)은 네트워크 없이 같은 처리 순서를 반복 검증하도록 메모리 구현과 테스트용 제공자를 연결합니다. PostgreSQL·Redis·Nginx 구성은 별도 Compose 파일에 있으나, 현재 README에서 보장하는 범위는 설정 구문 검사까지입니다.
 
-## 구현 API
+## 구현 API 범위
 
-| Method | Path | 목적 |
+| Method | Path | 범위 |
 |---|---|---|
-| `POST` | `/v1/chat/completions` | OpenAI 호환 chat completion 요청 |
-| `POST` | `/v1/batches/chat/completions` | 로컬 batch 요청 접수 |
-| `POST` | `/v1/batches/{id}/process` | batch 작업 실행 |
-| `GET` | `/v1/batches/{id}` | batch 상태와 결과 조회 |
+| `POST` | `/v1/chat/completions` | 제한된 Chat Completions 요청, JSON 응답 또는 `stream=true` SSE 응답 |
+| `POST` | `/v1/batches/chat/completions` | 메모리 배치 작업 접수 |
+| `POST` | `/v1/batches/{id}/process` | 접수된 메모리 배치 실행 |
+| `GET` | `/v1/batches/{id}` | tenant 범위 안에서 배치 상태·결과 조회 |
 
-## 구현 범위
+`messages`는 구조화된 대화 상태로 유지되지 않고 `role: content` 줄 단위의 단일 prompt로 평탄화됩니다. 따라서 전체 OpenAI API 호환이나 모든 Chat Completions 옵션 지원을 의미하지 않습니다.
 
-| 영역 | 구현 내용 | 확인 방법 |
+- 요청 변환: [ChatCompletionRequest](backend/src/main/java/com/example/gateway/web/ChatCompletionRequest.java)
+- 단건 API: [ChatCompletionController](backend/src/main/java/com/example/gateway/web/ChatCompletionController.java)
+- 배치 API: [BatchController](backend/src/main/java/com/example/gateway/web/BatchController.java)
+- 검증: [ChatCompletionControllerTest](backend/src/test/java/com/example/gateway/web/ChatCompletionControllerTest.java), [BatchControllerTest](backend/src/test/java/com/example/gateway/web/BatchControllerTest.java)
+
+## 핵심 설계 판단
+
+### 1. 인증에서 tenant를 확정한 뒤 파이프라인에 전달
+
+원문 API key는 저장하지 않고 SHA-256 해시로 조회합니다. 활성 key와 tenant가 확인된 경우에만 tenant ID를 요청 속성과 Reactor context에 넣습니다. 컨트롤러 슬라이스 테스트는 데이터베이스 대신 이 경계를 대체하는 테스트 필터를 사용합니다.
+
+- 구현: [API key 필터](backend/src/main/java/com/example/gateway/auth/ApiKeyAuthFilter.java), [R2DBC 저장소](backend/src/main/java/com/example/gateway/auth/R2dbcApiKeyRepository.java)
+- 검증: [ApiKeyAuthFilterTest](backend/src/test/java/com/example/gateway/auth/ApiKeyAuthFilterTest.java), [ChatCompletionControllerTest](backend/src/test/java/com/example/gateway/web/ChatCompletionControllerTest.java)
+
+### 2. 정확 일치 캐시와 유사도 캐시를 분리
+
+1단계 정확 일치 캐시는 tenant·model alias·정규화된 프롬프트의 SHA-256으로 동일 요청을 식별합니다. 2단계 유사도 캐시의 기본 임베딩은 외부 모델이 아니라 **영문 소문자와 숫자 토큰을 고정 차원에 해시하는 결정론적 테스트 구현**입니다. 한국어 의미 검색이나 실제 임베딩 품질을 나타내지 않습니다.
+
+- 구현: [ExactCache](backend/src/main/java/com/example/gateway/cache/ExactCache.java), [TwoStageCache](backend/src/main/java/com/example/gateway/cache/TwoStageCache.java), [DeterministicEmbeddingModel](backend/src/main/java/com/example/gateway/cache/DeterministicEmbeddingModel.java)
+- 검증: [ExactCacheTest](backend/src/test/java/com/example/gateway/cache/ExactCacheTest.java), [TwoStageCacheTest](backend/src/test/java/com/example/gateway/cache/TwoStageCacheTest.java), [PgVectorSemanticCacheTest](backend/src/test/java/com/example/gateway/cache/PgVectorSemanticCacheTest.java)
+
+### 3. 사용량 제한 비용은 통화가 아닌 로컬 정수 단위
+
+예산 선검사에서는 예상 토큰 수에 `microsPerToken` 정수를 곱한 값을 사용합니다. 요청 기록의 비용도 후보 모델에 지정된 `costPerKTokens`와 응답 토큰 수로 계산합니다. 두 값은 로컬 정책 비교를 위한 단위이며 실제 provider 가격, 청구액, 절감액이 아닙니다.
+
+- 구현: [FlatRateCostEstimator](backend/src/main/java/com/example/gateway/quota/FlatRateCostEstimator.java), [SlidingWindowQuotaGuard](backend/src/main/java/com/example/gateway/quota/SlidingWindowQuotaGuard.java), [GatewayPipeline](backend/src/main/java/com/example/gateway/api/GatewayPipeline.java)
+- 검증: [SlidingWindowQuotaGuardBudgetTest](backend/src/test/java/com/example/gateway/quota/SlidingWindowQuotaGuardBudgetTest.java), [InMemoryBudgetStoreTest](backend/src/test/java/com/example/gateway/quota/InMemoryBudgetStoreTest.java)
+
+### 4. 가중 분배는 프롬프트 문자열의 고정 버킷
+
+`WEIGHTED_SPLIT`은 프롬프트 문자열의 Java hash를 후보 가중치 합계로 나눈 버킷으로 1차 후보를 선택합니다. 같은 프롬프트는 같은 순서를 얻는 결정론적 분배이며, 사용자 단위 실험 배정이나 통계적 A/B 분석 기능은 아닙니다.
+
+- 구현: [PolicyRouter](backend/src/main/java/com/example/gateway/router/PolicyRouter.java), [RoutingStrategy](backend/src/main/java/com/example/gateway/router/RoutingStrategy.java)
+- 검증: [WeightedRoutingTest](backend/src/test/java/com/example/gateway/router/WeightedRoutingTest.java)
+
+### 5. 폴백과 재시도 예산을 요청 처리 단계에 포함
+
+`ROUTED_RESILIENT` 모드만 후보 수와 최대 시도 횟수 안에서 다음 제공자를 호출합니다. circuit breaker가 열린 후보는 제외하고, retry budget이 소진되면 추가 시도를 중단합니다.
+
+- 구현: [FallbackChain](backend/src/main/java/com/example/gateway/resilience/FallbackChain.java), [CircuitBreaker](backend/src/main/java/com/example/gateway/resilience/CircuitBreaker.java), [RetryBudget](backend/src/main/java/com/example/gateway/resilience/RetryBudget.java)
+- 검증: [FallbackChainTest](backend/src/test/java/com/example/gateway/resilience/FallbackChainTest.java), [CircuitBreakerTest](backend/src/test/java/com/example/gateway/resilience/CircuitBreakerTest.java), [RetryBudgetTest](backend/src/test/java/com/example/gateway/resilience/RetryBudgetTest.java)
+
+### 6. SSE는 완료 응답을 청크로 변환
+
+`stream=true`이면 제공자가 토큰을 생성하는 즉시 중계하는 것이 아니라, 이미 완료된 `CompletionResponse`를 role·content·finish·`[DONE]` 이벤트로 나눕니다. 스트리밍 응답 형식과 재조합 규칙을 검증하기 위한 구현입니다.
+
+- 구현: [StreamChunkProjector](backend/src/main/java/com/example/gateway/streaming/StreamChunkProjector.java), [ChatCompletionController](backend/src/main/java/com/example/gateway/web/ChatCompletionController.java)
+- 검증: [StreamChunkProjectorTest](backend/src/test/java/com/example/gateway/streaming/StreamChunkProjectorTest.java), [StreamingUsageAccumulatorTest](backend/src/test/java/com/example/gateway/streaming/StreamingUsageAccumulatorTest.java)
+
+## 코드와 테스트 근거
+
+| 기능 | 운영 코드 | 검증 코드 |
 |---|---|---|
-| 요청 처리 | auth, quota, guardrail, cache, router, dispatch, fallback, record 단계 | 백엔드 로컬 테스트 |
-| Routing | model alias, 고정된 weighted A/B 순서, 폴백 후보 | Phase 2 로컬 확장 테스트 |
-| Cache | exact·semantic cache, tenant·alias version 무효화 | 백엔드 테스트 |
-| Batch | 로컬 batch 접수, 실행, 상태 조회 | API 테스트, 정적 데모 |
-| Tool calls | OpenAI 방식의 `tools`·`tool_choice` 전달 | provider 분리 테스트 |
-| Web demo | Gateway Console, Usage & Cost, Request Trace | `web/scripts/verify-static-demo.mjs` |
-| 로컬 인프라 초안 | PostgreSQL+pgvector, Redis, Nginx Compose | `docker compose -f infra/local/docker-compose.yml config` |
+| 파이프라인 순서와 기본 구성 | [GatewayPipeline](backend/src/main/java/com/example/gateway/api/GatewayPipeline.java), [GatewayPipelineConfig](backend/src/main/java/com/example/gateway/config/GatewayPipelineConfig.java) | [GatewayPipelineConfigTest](backend/src/test/java/com/example/gateway/config/GatewayPipelineConfigTest.java) |
+| 요청·응답 일부 형식 | [ChatCompletionRequest](backend/src/main/java/com/example/gateway/web/ChatCompletionRequest.java), [ChatCompletionResponse](backend/src/main/java/com/example/gateway/web/ChatCompletionResponse.java) | [ChatCompletionControllerTest](backend/src/test/java/com/example/gateway/web/ChatCompletionControllerTest.java) |
+| tool 전달 | [CompletionRequest](backend/src/main/java/com/example/gateway/provider/CompletionRequest.java), [FakeLlmProvider](backend/src/main/java/com/example/gateway/provider/FakeLlmProvider.java) | [ToolCallPassthroughTest](backend/src/test/java/com/example/gateway/web/ToolCallPassthroughTest.java) |
+| 입력·출력 가드레일 | [RuleBasedGuardrail](backend/src/main/java/com/example/gateway/guardrail/RuleBasedGuardrail.java) | [RuleBasedGuardrailTest](backend/src/test/java/com/example/gateway/guardrail/RuleBasedGuardrailTest.java) |
+| 사용량 제한과 예산 | [SlidingWindowQuotaGuard](backend/src/main/java/com/example/gateway/quota/SlidingWindowQuotaGuard.java) | [SlidingWindowQuotaGuardTest](backend/src/test/java/com/example/gateway/quota/SlidingWindowQuotaGuardTest.java), [SlidingWindowQuotaGuardBudgetTest](backend/src/test/java/com/example/gateway/quota/SlidingWindowQuotaGuardBudgetTest.java) |
+| Redis 사용량 제한 저장소 | [RedisRateLimitStore](backend/src/main/java/com/example/gateway/quota/RedisRateLimitStore.java), [RedisBudgetStore](backend/src/main/java/com/example/gateway/quota/RedisBudgetStore.java) | [RedisQuotaStoreContractTest](backend/src/test/java/com/example/gateway/quota/RedisQuotaStoreContractTest.java), [RedisQuotaStoreConcurrencyTest](backend/src/test/java/com/example/gateway/quota/RedisQuotaStoreConcurrencyTest.java) |
+| 캐시 | [TwoStageCache](backend/src/main/java/com/example/gateway/cache/TwoStageCache.java) | [TwoStageCacheTest](backend/src/test/java/com/example/gateway/cache/TwoStageCacheTest.java), [VersionedSemanticCacheTest](backend/src/test/java/com/example/gateway/cache/VersionedSemanticCacheTest.java) |
+| 라우팅 | [PolicyRouter](backend/src/main/java/com/example/gateway/router/PolicyRouter.java) | [WeightedRoutingTest](backend/src/test/java/com/example/gateway/router/WeightedRoutingTest.java) |
+| 장애 복구 | [FallbackChain](backend/src/main/java/com/example/gateway/resilience/FallbackChain.java) | [FallbackChainTest](backend/src/test/java/com/example/gateway/resilience/FallbackChainTest.java) |
+| 요청 기록·집계 | [InMemoryRequestLogStore](backend/src/main/java/com/example/gateway/observability/InMemoryRequestLogStore.java), [UsageRollupAggregator](backend/src/main/java/com/example/gateway/observability/UsageRollupAggregator.java) | [RequestLogStoreTest](backend/src/test/java/com/example/gateway/observability/RequestLogStoreTest.java), [UsageRollupAggregatorTest](backend/src/test/java/com/example/gateway/observability/UsageRollupAggregatorTest.java) |
+| 고정 평가 실행 | [EvalRunner](backend/src/main/java/com/example/gateway/eval/EvalRunner.java), [GoldenRequests](backend/src/main/java/com/example/gateway/eval/GoldenRequests.java) | [EvalRunnerTest](backend/src/test/java/com/example/gateway/eval/EvalRunnerTest.java), [EvalReportTest](backend/src/test/java/com/example/gateway/eval/EvalReportTest.java) |
 
-## 비교 모드
+## 검증 시나리오
 
-| 모드 | 설명 |
-|---|---|
-| `PASSTHROUGH` | 단일 provider 직통 |
-| `CACHE_ONLY` | semantic cache만 적용 |
-| `ROUTED` | 정책 라우팅 적용 |
-| `ROUTED_RESILIENT` | 라우팅 + 폴백 + retry budget |
-| `WEIGHTED_SPLIT` | prompt 기준을 고정한 A/B 라우팅 |
+| 시나리오 | 관찰 기준 | 근거 |
+|---|---|---|
+| 인증 누락 | tenant가 없으면 Chat Completions 요청을 `401`로 거절 | [ChatCompletionControllerTest](backend/src/test/java/com/example/gateway/web/ChatCompletionControllerTest.java) |
+| 정확 일치 캐시 | 동일 요청의 두 번째 실행에서 `EXACT` 캐시와 비용 `0` 기록 | [GatewayPipelineConfigTest](backend/src/test/java/com/example/gateway/config/GatewayPipelineConfigTest.java) |
+| 입력 차단 | 금지어가 포함된 요청은 제공자를 선택하지 않고 차단 | [RuleBasedGuardrailTest](backend/src/test/java/com/example/gateway/guardrail/RuleBasedGuardrailTest.java) |
+| 예산 초과 | 토큰·로컬 비용 단위 한도를 넘으면 파이프라인 진입 전 거절 | [SlidingWindowQuotaGuardBudgetTest](backend/src/test/java/com/example/gateway/quota/SlidingWindowQuotaGuardBudgetTest.java) |
+| 프롬프트 고정 분배 | 같은 프롬프트가 같은 가중 버킷 순서를 선택 | [WeightedRoutingTest](backend/src/test/java/com/example/gateway/router/WeightedRoutingTest.java) |
+| 후보 폴백 | 1차 제공자 실패 후 허용된 시도 안에서 다음 후보 호출 | [FallbackChainTest](backend/src/test/java/com/example/gateway/resilience/FallbackChainTest.java) |
+| SSE 재조합 | 분할된 content 청크를 합치면 완료 응답 원문과 일치 | [StreamChunkProjectorTest](backend/src/test/java/com/example/gateway/streaming/StreamChunkProjectorTest.java) |
+| tool call 반환 | `tools`와 `tool_choice`가 내부 요청을 거쳐 응답의 `tool_calls`로 반환 | [ToolCallPassthroughTest](backend/src/test/java/com/example/gateway/web/ToolCallPassthroughTest.java) |
+| 고정 평가 | 정상·cache hit·가드레일·실패 경로를 고정 입력으로 반복 실행 | [EvalRunnerTest](backend/src/test/java/com/example/gateway/eval/EvalRunnerTest.java) |
 
-## 기술 선택과 문제 해결
+## 재현 방법
 
-| 주제 | 고민한 점 | 적용 내용 | 확인 방법과 남은 과제 |
-|---|---|---|---|
-| 실제 provider 연동 보류 | 실제 provider를 먼저 붙이면 테스트가 비용·시크릿·네트워크에 의존함 | 테스트용 provider와 고정된 embedding 결과를 기본값으로 사용 | 로컬 회귀 테스트, 정적 데모 |
-| WebFlux gateway | 외부 API 호환성과 비동기 IO 처리가 중요함 | Spring Boot WebFlux | 백엔드 테스트 |
-| Redis 캐시 선택 테스트 | semantic cache의 Redis 통합과 기본 테스트를 분리해야 함 | Redis 테스트를 별도 실행 | Colima 환경의 `Redis*` 테스트 |
+### 기본 백엔드: Java 21
 
-## 빠른 실행
-
-Web 데모:
-
-```bash
-cd web
-npm run build
-npm test
-```
-
-백엔드 로컬 회귀 테스트:
+최초 실행은 Maven이 의존성을 내려받을 수 있는 네트워크가 필요합니다. Redis/Testcontainers 테스트를 제외한 기본 회귀 검사는 Docker 없이 실행합니다.
 
 ```bash
 cd backend
-MAVEN_OPTS="-Xmx512m" \
-JAVA_HOME=$(/usr/libexec/java_home -v 23) \
-mvn -B -o test -DargLine="-Xmx384m" -Dtest='!Redis*'
+java -version  # 21 확인
+mvn -B test -Dtest='!Redis*'
 ```
 
-Redis/Testcontainers 선택 테스트:
+### Redis/Testcontainers: Docker
+
+Docker daemon이 접근 가능한 환경에서 실행합니다. 최초 실행은 `redis:7-alpine` 이미지를 받을 네트워크 또는 미리 준비된 이미지가 필요합니다. 테스트가 조용히 건너뛰지 않았는지 Maven 요약에서 `RedisQuotaStoreContractTest`와 `RedisQuotaStoreConcurrencyTest`가 모두 실행되고 `Skipped: 0`인지 확인해야 합니다.
+
+```bash
+cd backend
+mvn -B test -Dtest='Redis*'
+```
+
+Colima를 사용하는 macOS에서 Docker socket 자동 탐지가 실패할 때만 다음 보정을 추가합니다.
 
 ```bash
 cd backend
@@ -142,62 +155,53 @@ TESTCONTAINERS_DOCKERCONFIG_SOURCE=autoIgnoringUserProperties \
 TESTCONTAINERS_RYUK_DISABLED=true \
 TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock \
 DOCKER_HOST="unix://${HOME}/.colima/default/docker.sock" \
-env 'api.version=1.44' \
-MAVEN_OPTS="-Xmx512m" \
-JAVA_HOME=$(/usr/libexec/java_home -v 23) \
-mvn -B -o test -DargLine="-Xmx384m" -Dtest='Redis*'
+env 'api.version=1.44' mvn -B test -Dtest='Redis*'
 ```
 
-## 테스트
+### 정적 웹 콘솔: Node.js 20.11 이상
 
-| 구분 | 명령 또는 결과 | 설명 |
-|---|---|---|
-| 기본 백엔드 | `mvn -B -o test -Dtest='!Redis*'` | Redis/Testcontainers를 제외한 로컬 회귀 테스트 |
-| Redis/Testcontainers | `mvn -B -o test -Dtest='Redis*'`와 Colima 환경 변수 | Docker 필요 |
-| Web 데모 | `cd web && npm run build && npm test` | 정적 콘솔 빌드와 테스트 |
-| 로컬 인프라 초안 | `docker compose -f infra/local/docker-compose.yml config` | Compose 설정 확인 |
-| 문서 | `docs/portfolio-one-pager.md`, `README.md` | 테스트용 provider, Redis 연동, 실제 provider 연동 범위 구분 |
+외부 제공자나 backend 없이 fixture 화면을 빌드하고 필수 UI 요소를 검사합니다.
 
-## 운영/배포
+```bash
+cd web
+npm ci
+npm run build
+npm test
+```
 
-| 항목 | 내용 | 확인 방법 |
-|---|---|---|
-| 기본 로컬 | 테스트용 provider, 메모리 저장소, 고정된 결과 | 백엔드 로컬 회귀 테스트 |
-| Redis 연동 | semantic cache Redis 테스트 | `Redis*` Testcontainers 테스트 |
-| 정적 데모 | 외부 서비스가 필요 없는 web 콘솔 | `npm run build`, `npm test` |
-| 로컬 인프라 초안 | PostgreSQL+pgvector, Redis, Nginx Compose | `docker compose ... config` |
+### 로컬 Compose 설정
+
+아래 명령은 PostgreSQL, Redis, gateway, Nginx 정의의 **구문과 병합 결과만** 검사합니다. 서비스 정상 기동, API key seed, API 성공, 성능을 검증하지 않습니다.
+
+```bash
+docker compose -f infra/local/docker-compose.yml config -q
+```
 
 ## 담당 범위
 
-개인 프로젝트이며, 직접 구현하고 테스트한 범위는 다음과 같습니다.
+개인 프로젝트로 다음 영역을 직접 설계·구현·테스트했습니다.
 
-| 분야 | 구현 내용 | 확인 방법 |
-|---|---|---|
-| Gateway API | OpenAI 호환 API와 batch 흐름 | 구현 API 4개와 controller 테스트 |
-| 요청 처리 | auth, quota, cache, router, fallback, trace 구성 | 백엔드 회귀 테스트 |
-| 로컬 테스트 | 비용 없는 테스트용 provider와 정적 데모 | web 테스트, 백엔드 로컬 테스트 |
-
-## 프로젝트 구조
-
-```text
-backend/   Spring Boot WebFlux gateway
-web/       외부 서비스가 필요 없는 정적 데모 콘솔
-infra/     로컬 Docker Compose 초안
-docs/      공개 문서와 실행 안내
-```
-
-## 참고 문서
-
-| 순서 | 문서 | 내용 |
-|---|---|---|
-| 1 | [Portfolio One-Pager](docs/portfolio-one-pager.md) | 프로젝트 요약과 제한 사항 |
-| 2 | [README](README.md) | 실행 방법, 테스트, 구현 API |
+- Java 21·Spring Boot WebFlux 기반 요청 처리 파이프라인
+- API key 해시 인증과 tenant 범위 전달
+- 제한된 Chat Completions 형식과 메모리 배치 API
+- 정확 일치·유사도 캐시, 사용량 제한·예산, 라우팅, 폴백, 가드레일
+- JSON 응답과 완료 응답 기반 SSE 청크 투영
+- 요청 기록, 사용량 집계, 고정 평가 실행기
+- Redis Testcontainers 검사와 정적 웹 콘솔
 
 ## 제한 사항
 
-- 자체 모델 서빙·추론 엔진 운영
-- OpenAI와 Anthropic 실제 호출 연동
-- 관리자 정책 CRUD API와 운영 대시보드 제품화
-- 실제 과금·정산·결제 흐름
-- 복잡한 MSA 분리, 멀티 리전·HA, 운영 Kubernetes
-- 로컬 Docker 결과를 운영 규모 성능으로 설명하지 않음
+- 구현 범위는 명시된 Chat Completions 필드와 네 개 엔드포인트까지이며 구조화된 멀티턴 상태나 실제 토큰 스트리밍은 포함하지 않습니다.
+- 기본 제공자와 임베딩은 결정론적 테스트 구현입니다. 실제 LLM 품질, 의미 검색 품질, 통화 단위 비용, 실험 분석을 나타내지 않습니다.
+- 배치 작업, 기본 캐시, 사용량 제한, 요청 기록은 메모리 구현이며 프로세스 재시작 시 유지되지 않습니다.
+- Redis는 선택형 통합 테스트로 확인하며 PostgreSQL·Redis·Nginx Compose는 설정 구문만 검사했습니다.
+- 멀티 리전, 고가용성, 실제 운영 부하와 성능 수치는 구현·검증 범위에 포함하지 않습니다.
+
+## 관련 문서
+
+| 자료 | 내용 |
+|---|---|
+| [기술 개요](docs/portfolio-one-pager.md) | 구현 단계와 현재 범위 요약 |
+| [초기 데이터 스키마](backend/src/main/resources/db/migration/V1__init.sql) | tenant, API key, quota, cache, 요청 기록 테이블 |
+| [로컬 인프라 구성](infra/local/docker-compose.yml) | PostgreSQL, Redis, gateway, Nginx 설정 |
+| [정적 데모 검사](web/scripts/verify-static-demo.mjs) | fixture 기반 웹 콘솔 검증 기준 |
