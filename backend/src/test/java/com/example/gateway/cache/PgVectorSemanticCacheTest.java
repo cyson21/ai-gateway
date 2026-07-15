@@ -5,8 +5,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.example.gateway.provider.CompletionRequest;
 import com.example.gateway.provider.CompletionResponse;
 import com.example.gateway.provider.LlmProvider;
+import com.example.gateway.provider.ToolDefinition;
+import com.example.gateway.provider.ToolDefinition.FunctionDefinition;
 import com.example.gateway.provider.Usage;
 
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
@@ -59,6 +63,11 @@ class PgVectorSemanticCacheTest {
 
     private static CompletionRequest request(String tenantId, String prompt) {
         return new CompletionRequest(tenantId, "gpt-4o", prompt, 256, false);
+    }
+
+    private static CompletionRequest request(String tenantId, String alias, String prompt, int maxTokens,
+                                             List<ToolDefinition> tools, String toolChoice) {
+        return new CompletionRequest(tenantId, alias, prompt, maxTokens, false, tools, toolChoice);
     }
 
     private static PgVectorSemanticCache cache(double threshold) {
@@ -120,7 +129,7 @@ class PgVectorSemanticCacheTest {
         CompletionRequest base = request("tenant-1", "alpha beta gamma delta");
         CompletionRequest query = request("tenant-1", "alpha beta gamma epsilon");
         double similarity = InMemorySemanticCacheStore.cosineSimilarity(
-                model.embed("gpt-4o\nalpha beta gamma delta"), model.embed("gpt-4o\nalpha beta gamma epsilon"));
+                model.embed("alpha beta gamma delta"), model.embed("alpha beta gamma epsilon"));
 
         // threshold exactly at the measured similarity -> hit (>= is inclusive)
         PgVectorSemanticCache atThreshold = new PgVectorSemanticCache(model, store, similarity);
@@ -149,5 +158,31 @@ class PgVectorSemanticCacheTest {
         // tenant-1 repeats -> still hits its own cache
         complete(cache, provider, request("tenant-1", "how do I reset my account password"));
         assertThat(provider.callCount()).isEqualTo(2);
+    }
+
+    @Test
+    void aliasesAreStrictlyPartitionedInsteadOfDependingOnVectorDistance() {
+        PgVectorSemanticCache cache = cache(0.1);
+        CompletionResponse response = new CompletionResponse("cached", "model-a", new Usage(1, 1));
+        cache.store(request("tenant-1", "alias-a", "shared prompt", 64, List.of(), null), response);
+
+        assertThat(cache.lookup(request("tenant-1", "alias-b", "shared prompt", 64, List.of(), null)).hit())
+                .isFalse();
+    }
+
+    @Test
+    void tokenAndToolContractsAreStrictlyPartitioned() {
+        PgVectorSemanticCache cache = cache(0.1);
+        ToolDefinition tool = new ToolDefinition("function",
+                new FunctionDefinition("lookup", "lookup", Map.of("type", "object")));
+        CompletionRequest stored = request("tenant-1", "gpt-4o", "shared prompt", 64, List.of(tool), "auto");
+        cache.store(stored, new CompletionResponse("cached", "model-a", new Usage(1, 1)));
+
+        assertThat(cache.lookup(request(
+                "tenant-1", "gpt-4o", "shared prompt", 128, List.of(tool), "auto")).hit()).isFalse();
+        assertThat(cache.lookup(request(
+                "tenant-1", "gpt-4o", "shared prompt", 64, List.of(tool), "required")).hit()).isFalse();
+        assertThat(cache.lookup(request(
+                "tenant-1", "gpt-4o", "shared prompt", 64, List.of(), null)).hit()).isFalse();
     }
 }

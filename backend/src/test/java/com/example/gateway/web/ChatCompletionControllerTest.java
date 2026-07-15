@@ -116,4 +116,15 @@ class ChatCompletionControllerTest {
                 .exchange()
                 .expectStatus().isBadRequest();
     }
+
+    @Test
+    void unsupportedModeReturnsStable400Message() {
+        authenticatedClient().post().uri("/v1/chat/completions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("X-Gateway-Mode", "not-a-mode")
+                .bodyValue(validBody())
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectBody(String.class).isEqualTo("unsupported X-Gateway-Mode");
+    }
 }

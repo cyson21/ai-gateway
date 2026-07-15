@@ -14,20 +14,21 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * index does the same nearest-neighbour search approximately at scale; here the scan is exact, which
  * is what unit tests want.
  *
- * <p>Each tenant has its own entry list (a {@link ConcurrentHashMap} of {@link CopyOnWriteArrayList}),
- * so {@link #nearest} can never return another tenant's entry — tenant isolation holds even for
- * semantically identical prompts. Real persistence, the ivfflat index, eviction, and distributed
- * concurrency are the E1 slice.
+ * <p>Each tenant/response-contract pair has its own entry list (a {@link ConcurrentHashMap} of
+ * {@link CopyOnWriteArrayList}), so nearest-neighbour search cannot cross tenant, alias, token, or
+ * tool boundaries. Real persistence, eviction, and distributed concurrency remain out of scope.
  */
 public final class InMemorySemanticCacheStore implements SemanticCacheStore {
 
     private record Entry(float[] embedding, CompletionResponse response) {}
 
-    private final ConcurrentHashMap<String, List<Entry>> byTenant = new ConcurrentHashMap<>();
+    private record Scope(String tenantId, String responseContract) {}
+
+    private final ConcurrentHashMap<Scope, List<Entry>> byScope = new ConcurrentHashMap<>();
 
     @Override
-    public Optional<Neighbor> nearest(String tenantId, float[] queryEmbedding) {
-        List<Entry> entries = byTenant.get(tenantId);
+    public Optional<Neighbor> nearest(String tenantId, String responseContract, float[] queryEmbedding) {
+        List<Entry> entries = byScope.get(new Scope(tenantId, responseContract));
         if (entries == null) {
             return Optional.empty();
         }
@@ -42,8 +43,8 @@ public final class InMemorySemanticCacheStore implements SemanticCacheStore {
     }
 
     @Override
-    public void add(String tenantId, float[] embedding, CompletionResponse response) {
-        byTenant.computeIfAbsent(tenantId, t -> new CopyOnWriteArrayList<>())
+    public void add(String tenantId, String responseContract, float[] embedding, CompletionResponse response) {
+        byScope.computeIfAbsent(new Scope(tenantId, responseContract), ignored -> new CopyOnWriteArrayList<>())
                 .add(new Entry(embedding.clone(), response));
     }
 

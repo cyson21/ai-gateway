@@ -2,27 +2,37 @@
 
 ## What It Shows
 
-AI Gateway is a multi-tenant LLM infrastructure backend with one OpenAI-compatible
-`/v1/chat/completions` entrypoint. It demonstrates provider routing, bounded fallback,
-exact and semantic cache, tenant quota and budget control, rule-based guardrails,
-streaming response projection, request observability, and deterministic evaluation.
+AI Gateway is a multi-tenant LLM infrastructure backend with an OpenAI-compatible
+local runtime focused on four implemented endpoints:
 
-The project is built to run without paid provider calls by default. Fake providers and
-deterministic embeddings keep the core behaviors reproducible in local tests and in the
-static demo console.
+- `POST /v1/chat/completions`
+- `POST /v1/batches/chat/completions`
+- `POST /v1/batches/{id}/process`
+- `GET  /v1/batches/{id}`
+
+It demonstrates deterministic routing, bounded fallback, exact/semantic cache behavior,
+tenant quota and budget control, rule-based guardrails, streaming response projection,
+request observability, and deterministic evaluation under a fake provider runtime.
+
+The project runs without paid provider calls by default. Fake providers and deterministic
+embeddings keep core behaviors reproducible in local tests and in the static demo console.
 
 ## Evidence
 
 - Backend runtime: Spring Boot WebFlux endpoint wired to real deterministic gateway components.
 - Resilience: fallback chain, retry budget, and circuit breaker are covered by unit tests.
 - Governance: API key filter, sliding-window rate limit, token/cost budget, and guardrails are covered.
-- Cache: exact cache plus deterministic semantic cache are covered, including cache-hit provider bypass.
+- Cache: exact and deterministic semantic cache are partitioned by tenant and response contract;
+  cache hits are rechecked by the output guardrail before they are served.
 - Streaming: OpenAI-compatible SSE chunk projection with final usage reconciliation is covered.
 - Observability: request log rows and usage rollups are covered by deterministic aggregation tests.
 - Eval: golden request set and mode-comparison report generation are covered.
 - Phase 2 local extensions: weighted A/B routing, cache invalidation, tool-call passthrough, and async
   batch processing are covered.
 - Demo: dependency-free web console with Gateway Console, Usage & Cost, and Request Trace views.
+- Public CI: Java 21 tests, Redis Testcontainers, and the dependency-free web build run on pull requests
+  and main pushes; deterministic JSON test evidence is retained as an artifact.
+- Implementation boundary: only the above four API paths are in scope. Models-list, admin 영역, and paid-provider workflows are deferred.
 
 ## How To Demo Locally
 
@@ -48,6 +58,6 @@ or send requests to a local backend by enabling the backend toggle and setting t
 ## Current Boundaries
 
 - Default runtime uses fake providers, in-memory stores, and deterministic embeddings.
-- Redis-backed store tests pass with local Colima/Testcontainers when Docker is running.
-- OpenAI/Anthropic live transports, admin CRUD APIs, actual AWS resources, and payment flows are outside
-  the local completion scope.
+- Redis-backed store tests are a separate Testcontainers gate and require a responsive Docker daemon.
+- CI evidence reports test totals and suite status only; it is not an operational load or latency report.
+- 외부 provider 연동, 관리자 기능 API, AWS 연계, and payment flow are out-of-scope for local completion.

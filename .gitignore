@@ -4,6 +4,8 @@ web/dist/
 web/node_modules/
 web/qa/
 node_modules/
+__pycache__/
+*.pyc
 
 # Local env
 .env

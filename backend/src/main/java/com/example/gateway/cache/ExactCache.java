@@ -3,9 +3,6 @@ package com.example.gateway.cache;
 import com.example.gateway.provider.CompletionRequest;
 import com.example.gateway.provider.CompletionResponse;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.Optional;
 
 /**
@@ -17,9 +14,9 @@ import java.util.Optional;
  *
  * <p>Two requests are "identical" when they share a tenant and produce the same {@code prompt_hash}.
  * The hash is a SHA-256 over the {@link #normalize normalized} prompt and the model alias, so prompt
- * text that differs only in surrounding or collapsible whitespace still hits, while a different
- * prompt, alias, or tenant is isolated to its own entry. Semantic (embedding) similarity is the C2
- * slice; this stage is exact-match only and never serves a semantically different prompt.
+ * text that differs only in surrounding or collapsible whitespace still hits. The response contract
+ * also includes the alias, token ceiling, tools, and tool choice, while tenant remains the store's
+ * separate key dimension. This stage never serves a semantically different prompt.
  *
  * <p>Persistence is delegated to a {@link CacheStore} port — an {@link InMemoryCacheStore} fake for
  * unit tests, a Redis/PostgreSQL {@code cache_entries} implementation in E1 — mirroring the
@@ -45,20 +42,12 @@ public final class ExactCache implements SemanticCache {
     }
 
     /**
-     * Stable {@code prompt_hash} for a request: SHA-256 over the model alias and the normalized
-     * prompt. The alias is part of the hash so the same prompt against a different model never reuses
-     * another model's answer; the tenant is the store's separate key dimension.
+     * Stable {@code prompt_hash} for a request: SHA-256 over the response-contract fingerprint and
+     * normalized prompt. Tenant remains the store's separate key dimension.
      */
     static String promptHash(CompletionRequest request) {
-        String material = request.alias() + '\n' + normalize(request.prompt());
-        try {
-            MessageDigest sha = MessageDigest.getInstance("SHA-256");
-            byte[] digest = sha.digest(material.getBytes(StandardCharsets.UTF_8));
-            return toHex(digest);
-        } catch (NoSuchAlgorithmException e) {
-            // SHA-256 is mandated by the JLS-required provider set; absence is a broken JRE.
-            throw new IllegalStateException("SHA-256 unavailable", e);
-        }
+        String material = CacheRequestFingerprint.responseContract(request) + '\n' + normalize(request.prompt());
+        return CacheRequestFingerprint.sha256(material);
     }
 
     /**
@@ -70,12 +59,4 @@ public final class ExactCache implements SemanticCache {
         return prompt.strip().replaceAll("\\s+", " ");
     }
 
-    private static String toHex(byte[] bytes) {
-        StringBuilder sb = new StringBuilder(bytes.length * 2);
-        for (byte b : bytes) {
-            sb.append(Character.forDigit((b >> 4) & 0xF, 16));
-            sb.append(Character.forDigit(b & 0xF, 16));
-        }
-        return sb.toString();
-    }
 }

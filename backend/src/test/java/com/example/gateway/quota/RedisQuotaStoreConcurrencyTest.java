@@ -47,7 +47,7 @@ import org.testcontainers.utility.DockerImageName;
  * bounded) {@code nowMillis}, so the system clock's jitter never ages a hit out mid-burst and the
  * count is fully deterministic.
  */
-@Testcontainers
+@Testcontainers(disabledWithoutDocker = true)
 class RedisQuotaStoreConcurrencyTest {
 
     @Container

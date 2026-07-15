@@ -41,6 +41,12 @@ class ApiKeyAuthFilterTest {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + rawKey));
     }
 
+    private MockServerWebExchange exchangeWithAuthorization(String value) {
+        return MockServerWebExchange.from(MockServerHttpRequest
+                .post("/v1/chat/completions")
+                .header(HttpHeaders.AUTHORIZATION, value));
+    }
+
     @Test
     void activeKeyResolvesTenantAndPassesThrough() {
         seed(VALID_KEY, new ApiKeyRecord("tenant-1", "ACTIVE", "ACTIVE"));
@@ -113,6 +119,67 @@ class ApiKeyAuthFilterTest {
 
         assertThat(chain.invoked).isTrue();
         assertThat(exchange.getResponse().getStatusCode()).isNull();
+    }
+
+    @Test
+    void bearerSchemeIsCaseInsensitive() {
+        seed(VALID_KEY, new ApiKeyRecord("tenant-1", "ACTIVE", "ACTIVE"));
+        MockServerWebExchange exchange = exchangeWithAuthorization("bearer " + VALID_KEY);
+        RecordingChain chain = new RecordingChain();
+
+        StepVerifier.create(filter.filter(exchange, chain)).verifyComplete();
+
+        assertThat(chain.invoked).isTrue();
+        assertThat(chain.contextTenant).isEqualTo("tenant-1");
+    }
+
+    @Test
+    void duplicateAuthorizationHeadersAreRejected() {
+        seed(VALID_KEY, new ApiKeyRecord("tenant-1", "ACTIVE", "ACTIVE"));
+        MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest
+                .post("/v1/chat/completions")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + VALID_KEY, "Bearer " + VALID_KEY));
+        RecordingChain chain = new RecordingChain();
+
+        StepVerifier.create(filter.filter(exchange, chain)).verifyComplete();
+
+        assertThat(chain.invoked).isFalse();
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void bearerTokenContainingWhitespaceIsRejected() {
+        MockServerWebExchange exchange = exchangeWithAuthorization("Bearer two tokens");
+        RecordingChain chain = new RecordingChain();
+
+        StepVerifier.create(filter.filter(exchange, chain)).verifyComplete();
+
+        assertThat(chain.invoked).isFalse();
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void actuatorLookalikePathStillRequiresAuthentication() {
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/actuator-admin"));
+        RecordingChain chain = new RecordingChain();
+
+        StepVerifier.create(filter.filter(exchange, chain)).verifyComplete();
+
+        assertThat(chain.invoked).isFalse();
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void activeRecordWithBlankTenantIsRejected() {
+        seed(VALID_KEY, new ApiKeyRecord(" ", "ACTIVE", "ACTIVE"));
+        MockServerWebExchange exchange = exchangeWithKey(VALID_KEY);
+        RecordingChain chain = new RecordingChain();
+
+        StepVerifier.create(filter.filter(exchange, chain)).verifyComplete();
+
+        assertThat(chain.invoked).isFalse();
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
     /** Captures whether the downstream chain ran and what tenant id reached the Reactor context. */
