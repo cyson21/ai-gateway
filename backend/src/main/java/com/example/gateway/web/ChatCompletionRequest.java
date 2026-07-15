@@ -33,11 +33,15 @@ public record ChatCompletionRequest(
     /**
      * Map to the normalized request, attaching the tenant resolved by the auth filter.
      * Field-level validation (blank alias, non-positive tokens) is enforced by
-     * {@link CompletionRequest}; an empty message list is rejected here as a malformed body.
+     * {@link CompletionRequest}; a missing, empty, or null-containing message list is rejected
+     * here as a malformed body.
      */
     public CompletionRequest toCompletionRequest(String tenantId) {
         if (messages == null || messages.isEmpty()) {
             throw new IllegalArgumentException("messages is required");
+        }
+        if (messages.stream().anyMatch(message -> message == null)) {
+            throw new IllegalArgumentException("messages must not contain null elements");
         }
         int tokens = (maxTokens == null || maxTokens <= 0) ? DEFAULT_MAX_TOKENS : maxTokens;
         boolean streaming = stream != null && stream;
@@ -48,9 +52,6 @@ public record ChatCompletionRequest(
     private String flattenMessages() {
         StringBuilder sb = new StringBuilder();
         for (Message message : messages) {
-            if (message == null) {
-                continue;
-            }
             if (sb.length() > 0) {
                 sb.append('\n');
             }
