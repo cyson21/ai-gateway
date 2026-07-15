@@ -173,6 +173,24 @@ class FallbackChainTest {
     }
 
     @Test
+    void nullProviderResponseIsFailureAndFallsBack() {
+        LlmProvider nullProvider = new LlmProvider() {
+            @Override public String name() { return "p-a"; }
+            @Override public boolean healthy() { return true; }
+            @Override public CompletionResponse complete(String model, CompletionRequest request) { return null; }
+        };
+        FakeLlmProvider fallback = new FakeLlmProvider("p-b");
+        FallbackChain chain = new FallbackChain(registry(Map.of("p-a", nullProvider, "p-b", fallback)));
+
+        FallbackResult result = chain.dispatch(
+                ordered(candidate("p-a", "m-a"), candidate("p-b", "m-b")), REQUEST);
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.chosen().provider()).isEqualTo("p-b");
+        assertThat(result.events().getFirst().errorType()).isEqualTo("provider returned null response");
+    }
+
+    @Test
     void emptyOrderedChainRejected() {
         FallbackChain chain = new FallbackChain(id -> new FakeLlmProvider(id));
         org.assertj.core.api.Assertions

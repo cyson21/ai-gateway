@@ -1,6 +1,7 @@
 package com.example.gateway.auth;
 
 import java.util.Optional;
+import java.util.List;
 
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -31,8 +32,8 @@ public class ApiKeyAuthFilter implements WebFilter {
     /** Reactor context key carrying the resolved tenant id. */
     public static final String TENANT_ID_CONTEXT_KEY = "gateway.tenantId";
 
-    private static final String BEARER_PREFIX = "Bearer ";
-    private static final String EXEMPT_PREFIX = "/actuator";
+    private static final String BEARER_SCHEME = "Bearer";
+    private static final String ACTUATOR_ROOT = "/actuator";
 
     private final ApiKeyRepository repository;
 
@@ -54,6 +55,7 @@ public class ApiKeyAuthFilter implements WebFilter {
         // authorized path because chain.filter returns an empty Mono<Void>.
         return repository.findByKeyHash(ApiKeyHasher.sha256Hex(token))
                 .filter(ApiKeyRecord::isActive)
+                .filter(record -> record.tenantId() != null && !record.tenantId().isBlank())
                 .map(record -> Optional.of(record.tenantId()))
                 .defaultIfEmpty(Optional.empty())
                 .flatMap(tenant -> tenant
@@ -62,16 +64,22 @@ public class ApiKeyAuthFilter implements WebFilter {
     }
 
     private boolean isExempt(ServerWebExchange exchange) {
-        return exchange.getRequest().getPath().value().startsWith(EXEMPT_PREFIX);
+        String path = exchange.getRequest().getPath().value();
+        return ACTUATOR_ROOT.equals(path) || path.startsWith(ACTUATOR_ROOT + "/");
     }
 
     private String bearerToken(ServerWebExchange exchange) {
-        String header = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
-        if (header == null || !header.startsWith(BEARER_PREFIX)) {
+        List<String> headers = exchange.getRequest().getHeaders().getOrEmpty(HttpHeaders.AUTHORIZATION);
+        if (headers.size() != 1) {
             return null;
         }
-        String token = header.substring(BEARER_PREFIX.length()).trim();
-        return token.isEmpty() ? null : token;
+        String header = headers.getFirst();
+        int separator = header.indexOf(' ');
+        if (separator <= 0 || !BEARER_SCHEME.equalsIgnoreCase(header.substring(0, separator))) {
+            return null;
+        }
+        String token = header.substring(separator + 1).trim();
+        return token.isEmpty() || token.chars().anyMatch(Character::isWhitespace) ? null : token;
     }
 
     private Mono<Void> authorized(ServerWebExchange exchange, WebFilterChain chain, String tenantId) {

@@ -88,6 +88,10 @@ public final class GatewayPipeline {
         if (mode != PipelineMode.PASSTHROUGH) {
             SemanticCache.Lookup lookup = cache.lookup(request);
             if (lookup.hit()) {
+                GuardrailResult cachedOutput = guardrail.inspectOutput(lookup.response());
+                if (cachedOutput != GuardrailResult.PASS) {
+                    return blockedCacheHit(request, mode, lookup, elapsed(start));
+                }
                 return fromCache(request, mode, lookup, elapsed(start));
             }
         }
@@ -143,6 +147,16 @@ public final class GatewayPipeline {
                 latencyMs, 0L, lookup.type(), 0,
                 GuardrailResult.PASS, QuotaOutcome.ALLOWED, "served from " + lookup.type() + " cache");
         return new GatewayResult(record, response);
+    }
+
+    private GatewayResult blockedCacheHit(CompletionRequest request, PipelineMode mode,
+                                          SemanticCache.Lookup lookup, long latencyMs) {
+        CompletionResponse response = lookup.response();
+        RequestRecord record = new RequestRecord(request.tenantId(), request.alias(), mode,
+                "cache", response.model(), response.usage().promptTokens(), response.usage().completionTokens(),
+                latencyMs, 0L, lookup.type(), 0, GuardrailResult.BLOCKED_OUTPUT,
+                QuotaOutcome.ALLOWED, "cached response blocked by output guardrail");
+        return new GatewayResult(record, null);
     }
 
     private GatewayResult rejected(CompletionRequest request, PipelineMode mode, QuotaOutcome outcome, long latencyMs) {

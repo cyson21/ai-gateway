@@ -5,8 +5,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.example.gateway.provider.CompletionRequest;
 import com.example.gateway.provider.CompletionResponse;
 import com.example.gateway.provider.LlmProvider;
+import com.example.gateway.provider.ToolDefinition;
+import com.example.gateway.provider.ToolDefinition.FunctionDefinition;
 import com.example.gateway.provider.Usage;
 
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
@@ -62,6 +67,11 @@ class ExactCacheTest {
 
     private static CompletionRequest request(String tenantId, String alias, String prompt) {
         return new CompletionRequest(tenantId, alias, prompt, 256, false);
+    }
+
+    private static CompletionRequest request(String tenantId, String alias, String prompt, int maxTokens,
+                                             List<ToolDefinition> tools, String toolChoice) {
+        return new CompletionRequest(tenantId, alias, prompt, maxTokens, false, tools, toolChoice);
     }
 
     @Test
@@ -143,5 +153,49 @@ class ExactCacheTest {
         assertThat(store.putIfAbsent("tenant-1", "h", first)).isTrue();
         assertThat(store.putIfAbsent("tenant-1", "h", second)).isFalse(); // entry already present
         assertThat(store.get("tenant-1", "h")).contains(first);
+    }
+
+    @Test
+    void maxTokenBudgetPartitionsExactResponses() {
+        ExactCache cache = new ExactCache(new InMemoryCacheStore());
+        CountingProvider provider = new CountingProvider();
+
+        complete(cache, provider, request("tenant-1", "gpt-4o", "hello", 64, List.of(), null));
+        complete(cache, provider, request("tenant-1", "gpt-4o", "hello", 128, List.of(), null));
+
+        assertThat(provider.callCount()).isEqualTo(2);
+    }
+
+    @Test
+    void toolContractAndChoicePartitionExactResponses() {
+        ExactCache cache = new ExactCache(new InMemoryCacheStore());
+        CountingProvider provider = new CountingProvider();
+        ToolDefinition tool = new ToolDefinition("function",
+                new FunctionDefinition("lookup", "lookup", Map.of("type", "object")));
+
+        complete(cache, provider, request("tenant-1", "gpt-4o", "hello", 64, List.of(), null));
+        complete(cache, provider, request("tenant-1", "gpt-4o", "hello", 64, List.of(tool), "auto"));
+        complete(cache, provider, request("tenant-1", "gpt-4o", "hello", 64, List.of(tool), "required"));
+
+        assertThat(provider.callCount()).isEqualTo(3);
+    }
+
+    @Test
+    void reorderedToolSchemaMapsProduceSameDeterministicFingerprint() {
+        Map<String, Object> firstSchema = new LinkedHashMap<>();
+        firstSchema.put("type", "object");
+        firstSchema.put("required", List.of("id"));
+        Map<String, Object> secondSchema = new LinkedHashMap<>();
+        secondSchema.put("required", List.of("id"));
+        secondSchema.put("type", "object");
+
+        CompletionRequest first = request("tenant-1", "gpt-4o", "hello", 64,
+                List.of(new ToolDefinition("function", new FunctionDefinition("lookup", "lookup", firstSchema))),
+                "auto");
+        CompletionRequest second = request("tenant-1", "gpt-4o", "hello", 64,
+                List.of(new ToolDefinition("function", new FunctionDefinition("lookup", "lookup", secondSchema))),
+                "auto");
+
+        assertThat(ExactCache.promptHash(first)).isEqualTo(ExactCache.promptHash(second));
     }
 }

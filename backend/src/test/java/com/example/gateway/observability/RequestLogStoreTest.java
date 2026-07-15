@@ -3,6 +3,7 @@ package com.example.gateway.observability;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.gateway.api.GatewayPipeline;
+import com.example.gateway.api.GatewayResult;
 import com.example.gateway.api.PipelineMode;
 import com.example.gateway.cache.CacheType;
 import com.example.gateway.cache.SemanticCache;
@@ -198,6 +199,21 @@ class RequestLogStoreTest {
         assertThat(row.chosenProvider()).isEqualTo("cache");
         assertThat(row.cost()).isZero();
         assertThat(row.budgetOutcome()).isEqualTo("ALLOWED");
+    }
+
+    @Test
+    void cacheHitIsRecheckedByOutputGuardrailBeforeServing() {
+        GatewayPipeline p = pipeline(quota(QuotaOutcome.ALLOWED),
+                guardrail(GuardrailResult.PASS, GuardrailResult.BLOCKED_OUTPUT),
+                hitCache(CacheType.EXACT), fixedPlan(FAKE_CANDIDATE), okProvider());
+
+        GatewayResult result = p.execute(request("tenant-1"), PipelineMode.ROUTED);
+
+        assertThat(result.hasResponse()).isFalse();
+        assertThat(result.record().guardrailResult()).isEqualTo(GuardrailResult.BLOCKED_OUTPUT);
+        assertThat(result.record().cacheType()).isEqualTo(CacheType.EXACT);
+        assertThat(result.record().chosenProvider()).isEqualTo("cache");
+        assertThat(result.record().message()).isEqualTo("cached response blocked by output guardrail");
     }
 
     @Test

@@ -86,7 +86,11 @@ public class ChatCompletionController {
         if (raw == null || raw.isBlank()) {
             return PipelineMode.ROUTED_RESILIENT;
         }
-        return PipelineMode.valueOf(raw.trim().toUpperCase(java.util.Locale.ROOT));
+        try {
+            return PipelineMode.valueOf(raw.trim().toUpperCase(java.util.Locale.ROOT));
+        } catch (IllegalArgumentException ignored) {
+            throw new IllegalArgumentException("unsupported X-Gateway-Mode");
+        }
     }
 
     private HttpStatus statusFor(GatewayResult result) {

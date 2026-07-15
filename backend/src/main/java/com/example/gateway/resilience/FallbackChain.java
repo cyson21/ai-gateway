@@ -152,6 +152,9 @@ public final class FallbackChain {
             try {
                 LlmProvider provider = providers.get(candidate.provider());
                 CompletionResponse response = provider.complete(candidate.model(), request);
+                if (response == null) {
+                    throw new IllegalStateException("provider returned null response");
+                }
                 if (breaker != null) {
                     breaker.recordSuccess(candidate.provider());
                 }

@@ -19,7 +19,7 @@ class ChatCompletionRequestTest {
     void preservesMessageOrderAndInsertsSingleNewlineBetweenMessages() {
         ChatCompletionRequest.Message first = new ChatCompletionRequest.Message("system", "system prompt");
         ChatCompletionRequest.Message second = new ChatCompletionRequest.Message("user", "line1\nline2");
-        ChatCompletionRequest.Message third = new ChatCompletionRequest.Message(null, "assistant follow-up");
+        ChatCompletionRequest.Message third = new ChatCompletionRequest.Message(" USER ", "assistant follow-up");
 
         ChatCompletionRequest request = new ChatCompletionRequest(
                 "gpt-4o",
@@ -34,20 +34,17 @@ class ChatCompletionRequestTest {
     }
 
     @Test
-    void handlesNullContentAndNullRoleByApplyingFieldDefaults() {
-        ChatCompletionRequest.Message nullRole = new ChatCompletionRequest.Message(null, "null role content");
-        ChatCompletionRequest.Message nullContent = new ChatCompletionRequest.Message("assistant", null);
-
-        ChatCompletionRequest request = new ChatCompletionRequest(
-                "gpt-4o",
-                List.of(nullRole, nullContent),
-                64,
-                false);
-
-        CompletionRequest completionRequest = request.toCompletionRequest("tenant-1");
-
-        assertThat(completionRequest.prompt())
-                .isEqualTo("user: null role content\nassistant: ");
+    void rejectsMissingRoleAndContentWithIndexedErrors() {
+        assertThatThrownBy(() -> new ChatCompletionRequest("gpt-4o",
+                List.of(new ChatCompletionRequest.Message(null, "content")), 64, false)
+                .toCompletionRequest("tenant-1"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("messages[0].role is required");
+        assertThatThrownBy(() -> new ChatCompletionRequest("gpt-4o",
+                List.of(new ChatCompletionRequest.Message("assistant", "  ")), 64, false)
+                .toCompletionRequest("tenant-1"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("messages[0].content is required");
     }
 
     @Test
@@ -91,8 +88,52 @@ class ChatCompletionRequestTest {
     @Test
     void appliesDefaultMaxTokensAndStreamAndNullToolDefaults() {
         assertDefaultMaxTokensAndObservedDefaults(null);
-        assertDefaultMaxTokensAndObservedDefaults(0);
-        assertDefaultMaxTokensAndObservedDefaults(-1);
+    }
+
+    @Test
+    void rejectsNonPositiveAndExcessiveMaxTokens() {
+        for (int invalid : List.of(0, -1)) {
+            assertThatThrownBy(() -> new ChatCompletionRequest("gpt-4o",
+                    List.of(new ChatCompletionRequest.Message("user", "ping")), invalid, false)
+                    .toCompletionRequest("tenant-1"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("max_tokens must be positive");
+        }
+        assertThatThrownBy(() -> new ChatCompletionRequest("gpt-4o",
+                List.of(new ChatCompletionRequest.Message("user", "ping")),
+                ChatCompletionRequest.MAX_MAX_TOKENS + 1, false).toCompletionRequest("tenant-1"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("max_tokens must be at most " + ChatCompletionRequest.MAX_MAX_TOKENS);
+    }
+
+    @Test
+    void rejectsUnsupportedRole() {
+        assertThatThrownBy(() -> new ChatCompletionRequest("gpt-4o",
+                List.of(new ChatCompletionRequest.Message("owner", "ping")), 64, false)
+                .toCompletionRequest("tenant-1"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("messages[0].role is unsupported");
+    }
+
+    @Test
+    void rejectsNullToolsAndInvalidToolChoiceBoundaries() {
+        List<ToolDefinition> toolsWithNull = new ArrayList<>();
+        toolsWithNull.add(null);
+        assertThatThrownBy(() -> new ChatCompletionRequest("gpt-4o",
+                List.of(new ChatCompletionRequest.Message("user", "ping")), 64, false,
+                toolsWithNull, null).toCompletionRequest("tenant-1"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("tools must not contain null elements");
+        assertThatThrownBy(() -> new ChatCompletionRequest("gpt-4o",
+                List.of(new ChatCompletionRequest.Message("user", "ping")), 64, false,
+                List.of(), "sometimes").toCompletionRequest("tenant-1"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("tool_choice is unsupported");
+        assertThatThrownBy(() -> new ChatCompletionRequest("gpt-4o",
+                List.of(new ChatCompletionRequest.Message("user", "ping")), 64, false,
+                List.of(), "required").toCompletionRequest("tenant-1"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("tool_choice requires at least one tool");
     }
 
     private void assertDefaultMaxTokensAndObservedDefaults(Integer maxTokens) {

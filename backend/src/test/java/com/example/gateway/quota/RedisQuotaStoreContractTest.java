@@ -27,7 +27,7 @@ import org.testcontainers.utility.DockerImageName;
  * uses a fresh key (or FLUSHDB) so cases stay isolated. The multi-threaded distributed-load proof
  * is the E1b slice; here the basic boundary/isolation/clamp contracts are enough.
  */
-@Testcontainers
+@Testcontainers(disabledWithoutDocker = true)
 class RedisQuotaStoreContractTest {
 
     @Container

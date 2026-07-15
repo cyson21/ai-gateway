@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Verify evidence generator
+        run: python3 -m unittest discover -s tools/portfolio-evidence/tests -p 'test_*.py'
+      - name: Run backend and Redis integration tests
+        working-directory: backend
+        run: mvn -B --no-transfer-progress test
+      - name: Generate deterministic test evidence
+        if: always()
+        env:
+          EVIDENCE_COMMIT: ${{ github.sha }}
+        run: |
+          export SOURCE_DATE_EPOCH="$(git show -s --format=%ct "$GITHUB_SHA")"
+          python3 tools/portfolio-evidence/generate_report.py \
+            --reports backend/target/surefire-reports \
+            --output evidence/ai-gateway-tests.json
+      - name: Upload backend evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-gateway-test-evidence
+          if-no-files-found: error
+          path: |
+            evidence/ai-gateway-tests.json
+            backend/target/surefire-reports/TEST-*.xml
+
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Build static demo
+        working-directory: web
+        run: npm run build
+      - name: Verify static demo
+        working-directory: web
+        run: npm test
