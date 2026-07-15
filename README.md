@@ -2,6 +2,10 @@
 
 AI Gateway는 LLM 요청 앞단의 인증, 사용량 제한, 캐시, 라우팅, 폴백, 가드레일, 요청 기록을 하나의 파이프라인으로 구성한 Java 21·Spring Boot WebFlux 프로젝트입니다. HTTP 계층은 OpenAI Chat Completions의 일부 요청·응답 형식과 로컬 배치 API를 구현합니다. 기본 런타임은 테스트용 제공자와 메모리 저장소를 사용하며 실제 OpenAI·Anthropic 호출이나 실제 과금 연동은 포함하지 않습니다.
 
+## 포트폴리오 링크
+
+- [웹 사례](https://cyson21.github.io/projects/ai-gateway/) · [전체 포트폴리오 PDF](https://github.com/cyson21/portfolio-hub/releases/download/latest/portfolio-complete.pdf) · [최신 이력서](https://github.com/cyson21/portfolio-hub/releases/download/latest/resume.pdf)
+
 ## 한눈에 보기
 
 | 항목 | 내용 |
