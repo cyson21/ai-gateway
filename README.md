@@ -4,6 +4,10 @@
 
 애플리케이션은 provider SDK 대신 gateway의 OpenAI 호환 인터페이스 하나만 바라보고, provider 선택·폴백·캐시·예산·관측은 gateway가 책임집니다.
 
+## 포트폴리오 링크
+
+- [웹 사례](https://cyson21.github.io/projects/ai-gateway/) · [전체 포트폴리오 PDF](https://github.com/cyson21/portfolio-hub/releases/download/latest/portfolio-complete.pdf) · [최신 이력서](https://github.com/cyson21/portfolio-hub/releases/download/latest/resume.pdf)
+
 ## 상태
 
 MVP 범위는 M6 Demo까지 완료했고, 2026-06-17에 비-AWS Phase 2 local extension 4개(Model A/B routing, cache invalidation policy, tool-call passthrough, async batch endpoint)도 완료했습니다. 기본 실행은 fake provider, in-memory store, deterministic embedding을 사용해 비용 없이 재현됩니다.
@@ -11,7 +15,7 @@ MVP 범위는 M6 Demo까지 완료했고, 2026-06-17에 비-AWS Phase 2 local ex
 검증 기준:
 
 - Backend: `cd backend && MAVEN_OPTS="-Xmx512m" JAVA_HOME=$(/usr/libexec/java_home -v 23) mvn -B -o test -DargLine="-Xmx384m" -Dtest='!Redis*'`
-- Redis/Testcontainers: `cd backend && TESTCONTAINERS_DOCKERCONFIG_SOURCE=autoIgnoringUserProperties TESTCONTAINERS_RYUK_DISABLED=true TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock DOCKER_HOST=unix:///Users/chanyang.son/.colima/default/docker.sock env 'api.version=1.44' MAVEN_OPTS="-Xmx512m" JAVA_HOME=$(/usr/libexec/java_home -v 23) mvn -B -o test -DargLine="-Xmx384m" -Dtest='Redis*'`
+- Redis/Testcontainers: `cd backend && TESTCONTAINERS_DOCKERCONFIG_SOURCE=autoIgnoringUserProperties TESTCONTAINERS_RYUK_DISABLED=true TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock DOCKER_HOST=unix://$HOME/.colima/default/docker.sock env 'api.version=1.44' MAVEN_OPTS="-Xmx512m" JAVA_HOME=$(/usr/libexec/java_home -v 23) mvn -B -o test -DargLine="-Xmx384m" -Dtest='Redis*'`
 - Web demo: `cd web && npm run build && npm test`
 - Local infra draft: `docker compose -f infra/local/docker-compose.yml config`
 
