@@ -2,9 +2,9 @@
 
 [![CI](https://github.com/cyson21/ai-gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/cyson21/ai-gateway/actions/workflows/ci.yml)
 
-여러 애플리케이션의 LLM 요청에 조직 인증, 사용량 제한, 캐시, 모델 선택, 장애 복구와 입력·출력 검사를 공통으로 적용하는 Java 21·Spring WebFlux 프로젝트입니다.
+여러 애플리케이션의 LLM 요청에 조직 인증, 사용량 제한, 캐시와 모델 장애 복구 정책을 한곳에서 일관되게 적용하는 Java 21·Spring WebFlux 프로젝트입니다.
 
-개인 프로젝트로 요청 파이프라인, 인증·할당량·캐시·모델 선택·실패 복구 정책과 정적 운영 콘솔을 직접 설계·구현했습니다.
+개인 프로젝트로 요청 처리 흐름, 조직별 사용량·캐시 정책, 모델 선택과 제한된 장애 복구를 직접 설계·구현했습니다.
 
 [웹 사례](https://cyson21.github.io/projects/ai-gateway/) · [전체 포트폴리오 PDF](https://github.com/cyson21/portfolio-hub/releases/download/latest/portfolio-complete.pdf) · [최신 이력서](https://github.com/cyson21/portfolio-hub/releases/download/latest/resume.pdf)
 
@@ -26,7 +26,7 @@ Bearer API 키 -> SHA-256 조회 -> 조직 식별
 - 원문 API 키를 저장하지 않고 해시 조회 결과로 조직을 식별합니다.
 - 정확 일치 캐시는 조직, 정규화한 입력문, 모델 별칭, `max_tokens`, 도구 설정이 모두 같은 요청만 재사용합니다.
 - 유사도 캐시는 입력문 유사도를 계산하되 조직과 응답 조건이 다른 결과는 공유하지 않습니다.
-- 모델 선택과 장애 복구를 분리해 평상시 선택 기준과 실패 시 후보 전환을 각각 검증합니다.
+- 모델 선택과 장애 복구를 분리해 평상시 선택 기준과 실패 시 후보 전환 범위를 독립적으로 관리합니다.
 
 ## 실패 조건
 
@@ -72,7 +72,7 @@ cd backend
 mvn -B test -Dtest='Redis*'
 ```
 
-정적 웹 콘솔은 외부 패키지 없이 Node.js 내장 기능과 fixture만 사용합니다.
+정적 웹 콘솔은 외부 패키지 없이 Node.js 내장 기능과 포함된 고정 데이터만 사용합니다.
 
 ```bash
 cd web
