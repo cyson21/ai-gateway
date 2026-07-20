@@ -5,6 +5,7 @@
 - 이 파일은 저장소 전체에 적용한다.
 - 더 하위 경로에 별도 `AGENTS.md`가 생기면 해당 범위에서는 하위 파일이 우선한다.
 - 요청과 관련 없는 모듈, 문서, 인프라 파일은 함께 정리하거나 재작성하지 않는다.
+- `side-projects` 작업공간에서 브랜치·PR·Git worktree를 다룰 때는 [공통 운영 규칙](../../docs/standards/git-branch-worktree-operations.md)을 따른다.
 
 ## 저장소 구조
 
