@@ -39,7 +39,7 @@ jobs:
             --output evidence/ai-gateway-tests.json
       - name: Upload backend evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ai-gateway-test-evidence
           if-no-files-found: error
