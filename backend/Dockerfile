@@ -5,7 +5,7 @@ COPY pom.xml .
 COPY src ./src
 RUN mvn -B -DskipTests package
 
-FROM eclipse-temurin:21-jre
+FROM eclipse-temurin:24-jre
 WORKDIR /app
 
 COPY --from=build /workspace/target/ai-gateway-backend-0.0.1-SNAPSHOT.jar /app/ai-gateway.jar
