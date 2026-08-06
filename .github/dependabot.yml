@@ -48,6 +48,15 @@ updates:
     schedule:
       interval: monthly
     open-pull-requests-limit: 3
+    # 기준 JDK는 backend/pom.xml의 java.version과 AGENTS.md가 정한다.
+    # 태그 접미사 -eclipse-temurin-NN의 JDK 메이저는 dependabot의 semver 비교 대상이 아니어서
+    # minor/patch 그룹으로도 걸러지지 않으므로 두 이미지는 전체를 무시하고 사람이 함께 올린다.
+    ignore:
+      - dependency-name: maven
+      - dependency-name: eclipse-temurin
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-major
     groups:
       docker-minor-patch:
         patterns:
