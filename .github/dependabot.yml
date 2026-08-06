@@ -18,6 +18,12 @@ updates:
     schedule:
       interval: monthly
     open-pull-requests-limit: 5
+    # 프레임워크 메이저 업그레이드는 코드 마이그레이션을 동반하므로 사람이 판단한다.
+    # 마이너·패치 보안 갱신은 계속 받는다.
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-major
     groups:
       maven-minor-patch:
         patterns:
@@ -31,6 +37,12 @@ updates:
     schedule:
       interval: monthly
     open-pull-requests-limit: 5
+    # 프레임워크 메이저 업그레이드는 코드 마이그레이션을 동반하므로 사람이 판단한다.
+    # 마이너·패치 보안 갱신은 계속 받는다.
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-major
     groups:
       npm-production-minor-patch:
         dependency-type: production
