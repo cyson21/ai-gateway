@@ -1,0 +1,36 @@
+# Dockerfile·이미지 패키징 컨텍스트 변경 PR에서만 이미지 빌드를 검증합니다 (push 없음).
+name: Docker Build
+
+on:
+  pull_request:
+    paths:
+      - "backend/Dockerfile"
+      - ".github/workflows/docker-build.yml"
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: docker-build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docker-backend:
+    name: Docker backend image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build backend image
+        uses: docker/build-push-action@v7
+        with:
+          context: backend
+          file: backend/Dockerfile
+          push: false
+          cache-from: type=gha,scope=ai-gateway-backend
+          cache-to: type=gha,mode=max,scope=ai-gateway-backend
