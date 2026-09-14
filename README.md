@@ -2,15 +2,53 @@
 
 [![CI](https://github.com/cyson21/ai-gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/cyson21/ai-gateway/actions/workflows/ci.yml)
 
-여러 애플리케이션의 LLM 요청에 조직 인증, 사용량 제한, 캐시와 모델 장애 복구 정책을 한곳에서 일관되게 적용하는 Java 21·Spring WebFlux 프로젝트입니다.
+여러 애플리케이션이 OpenAI·Anthropic 같은 모델 제공자를 직접 호출하는 대신, 인증·사용량·비용·캐시·장애 복구 정책을 공통 경계에서 일관되게 적용하도록 돕는 Java 21·Spring WebFlux 기반 개인 프로젝트입니다.
 
-개인 프로젝트로 요청 처리 흐름, 조직별 사용량·캐시 정책, 모델 선택과 제한된 장애 복구를 직접 설계·구현했습니다.
+## 왜 필요한가
+
+애플리케이션마다 provider routing, fallback, quota, 비용 제어, cache, guardrail과 usage tracking을 따로 구현하면 정책이 서비스마다 달라지고 운영 지점도 흩어집니다. Gateway를 앞에 두면 여러 애플리케이션의 요청을 같은 인증·제한·복구 규칙으로 처리하고, provider를 바꾸거나 정책을 조정할 때 애플리케이션별 중복 구현을 줄일 수 있습니다.
+
+## 어디에 사용하는가
+
+조직·테넌트별로 LLM 사용량과 비용을 제한해야 하는 서비스, 여러 모델 제공자 사이에서 비용·지연·가용성 기준으로 라우팅해야 하는 서비스, 공통 안전 정책과 요청 기록을 중앙화해야 하는 내부 AI 기능에 사용할 수 있습니다. 이 저장소의 기본 실행은 네트워크 없는 결정적 검증 경로이며 실제 provider 운영 품질이나 모델 품질을 의미하지 않습니다.
+
+## 요청은 어떻게 흐르는가
+
+하나의 요청은 인증으로 테넌트를 확정한 뒤 할당량과 입력 정책을 확인하고, 캐시와 라우팅을 거쳐 허용된 provider를 호출합니다. 실패하면 정해진 재시도 예산과 후보 안에서만 fallback을 수행하고, 출력 검사를 통과한 결과와 사용량·비용 관찰값을 기록합니다.
+
+```text
+Auth → Quota → Guardrail → Cache → Router → Dispatch → Fallback → Guardrail → Record
+```
+
+## 핵심 기능
+
+- Provider routing & fallback: 비용·지연·고정 가중치와 후보 소진 범위에 따른 모델 선택·대체
+- Tenant quota / rate limiting: 조직별 요청·토큰·비용 예산 격리
+- Exact cache / semantic cache: 요청 조건과 조직을 기준으로 한 정확 일치·의미 유사도 재사용
+- Guardrail: 모델 호출 전 입력 검사와 응답 반환 전 출력 검사
+- Usage / cost observation: 요청·토큰·지연시간·추정 비용 기록
+- 추가 경로: 인증, dispatch, JSON·SSE streaming, circuit breaker, A/B routing, cache invalidation, tool-call passthrough, async batch
+
+## 기술 범위
+
+### Core / 검증
+
+- Java 21
+- Spring Boot WebFlux
+- In-memory 정책·배치·요청 기록
+- Fake Provider
+- Deterministic/Fake Embedding
+
+### Optional Integration
+
+- Redis
+- PostgreSQL
+- pgvector
+- 실제 provider 연동
+
+Optional Integration은 기본 실행과 분리된 선택 경로입니다. Redis·PostgreSQL·pgvector와 실제 provider를 운영 환경에서 사용했다는 의미가 아니라, 해당 경계를 연결할 수 있도록 구성하고 검증하는 범위입니다.
 
 [웹 사례](https://cyson21.github.io/projects/ai-gateway/) · [전체 포트폴리오 PDF](https://github.com/cyson21/portfolio-hub/releases/download/latest/portfolio-complete.pdf) · [최신 이력서](https://github.com/cyson21/portfolio-hub/releases/download/latest/resume.pdf)
-
-## 문제
-
-애플리케이션마다 인증과 모델 선택, 사용량 제한, 장애 복구를 따로 구현하면 조직별 격리와 비용 정책이 달라집니다. 요청이 모델 제공자에 도달하기 전에 공통 정책을 적용하고, 실패 시 허용된 후보와 재시도 횟수 안에서만 복구해야 합니다.
 
 ## 설계
 
@@ -27,7 +65,6 @@ Bearer API 키 -> SHA-256 조회 -> 조직 식별
 - 정확 일치 캐시는 조직, 정규화한 입력문, 모델 별칭, `max_tokens`, 도구 설정이 모두 같은 요청만 재사용합니다.
 - 유사도 캐시는 입력문 유사도를 계산하되 조직과 응답 조건이 다른 결과는 공유하지 않습니다.
 - 모델 선택과 장애 복구를 분리해 평상시 선택 기준과 실패 시 후보 전환 범위를 독립적으로 관리합니다.
-
 ## 실패 조건
 
 | 조건 | 보호 규칙 |
