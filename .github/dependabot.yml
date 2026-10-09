@@ -1,10 +1,11 @@
+# Portfolio maintenance: automated version PRs are paused; update dependencies manually when needed.
 version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: monthly
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 0
     groups:
       github-actions-minor-patch:
         patterns:
@@ -17,9 +18,8 @@ updates:
     directory: /backend
     schedule:
       interval: monthly
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
     # 프레임워크 메이저 업그레이드는 코드 마이그레이션을 동반하므로 사람이 판단한다.
-    # 마이너·패치 보안 갱신은 계속 받는다.
     ignore:
       - dependency-name: "*"
         update-types:
@@ -36,9 +36,8 @@ updates:
     directory: /web
     schedule:
       interval: monthly
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
     # 프레임워크 메이저 업그레이드는 코드 마이그레이션을 동반하므로 사람이 판단한다.
-    # 마이너·패치 보안 갱신은 계속 받는다.
     ignore:
       - dependency-name: "*"
         update-types:
@@ -59,7 +58,7 @@ updates:
     directory: /backend
     schedule:
       interval: monthly
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 0
     # 기준 JDK는 backend/pom.xml의 java.version(21)이다.
     # 태그 접미사 -eclipse-temurin-NN의 JDK 메이저는 dependabot의 semver 비교 대상이 아니어서
     # minor/patch 그룹으로도 걸러지지 않으므로 두 이미지는 전체를 무시하고 사람이 함께 올린다.
