@@ -4,7 +4,7 @@
 
 여러 서비스가 OpenAI나 Anthropic을 각자 호출하는 대신, 이 게이트웨이 하나를 거쳐 호출하게 만든 Java 21, Spring WebFlux 프로젝트입니다. 인증, 사용량 제한, 비용, 캐시, 장애 대응을 한곳에서 처리합니다. 설계부터 구현, 테스트까지 혼자 진행한 개인 프로젝트입니다.
 
-[포트폴리오](https://cyson21.github.io/projects/ai-gateway/) · [이력서](https://github.com/cyson21/portfolio-hub/releases/download/latest/resume.pdf)
+[포트폴리오](https://cyson21.github.io/projects/ai-gateway/) · [이력서](https://cyson21.github.io/downloads/resume.pdf)
 
 ## 왜 만들었나
 
@@ -110,3 +110,12 @@ npm test
 - SSE는 완성된 응답을 잘라서 보내는 방식이라, 실제 모델 토큰을 실시간으로 중계한 건 아닙니다.
 - 기본 캐시, 사용량 제한, 배치, 요청 기록은 메모리에 있어서 재시작하면 사라집니다.
 - PostgreSQL, Redis, Nginx Compose는 구성이 맞는지만 확인했습니다. 대규모 부하, 고가용성, 실제 과금 연동은 해 보지 않았습니다.
+
+## 관련 프로젝트와 공개 자료
+
+이 저장소의 코드·실행·테스트는 이 저장소에서 관리합니다. [웹 포트폴리오의 프로젝트 설명](https://cyson21.github.io/projects/ai-gateway/)과 [공개 자료 안내](https://github.com/cyson21/portfolio-hub)는 외부에서 구현 근거를 찾는 진입점입니다.
+
+- 관련 주제: [enterprise-policy-rag](https://github.com/cyson21/enterprise-policy-rag) — LLM 호출 정책과 권한 기반 검색 비교.
+- 최신 제출 파일: [이력서 PDF](https://cyson21.github.io/downloads/resume.pdf) · [경력기술서 PDF](https://cyson21.github.io/downloads/career-description.pdf).
+
+위 관련 저장소는 별도로 실행하는 개인 프로젝트입니다. 서로의 서비스를 순서대로 띄우거나 실제 API·메시지로 연결한 E2E 체인이 구현됐다는 의미는 아닙니다. 구현·검증 범위가 바뀌면 이 README와 웹 프로젝트 문안을 함께 확인합니다.
