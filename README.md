@@ -113,7 +113,7 @@ npm test
 
 ## 관련 프로젝트와 공개 자료
 
-이 저장소의 코드·실행·테스트는 이 저장소에서 관리합니다. [웹 포트폴리오의 프로젝트 설명](https://cyson21.github.io/projects/ai-gateway/)과 [공개 자료 안내](https://github.com/cyson21/portfolio-hub)는 외부에서 구현 근거를 찾는 진입점입니다.
+이 저장소의 코드·실행·테스트는 이 저장소에서 관리합니다. [웹 포트폴리오의 프로젝트 설명](https://cyson21.github.io/projects/ai-gateway/)에서 구현 근거를, [공개 웹사이트](https://cyson21.github.io/)에서 전체 공개 자료를 확인할 수 있습니다.
 
 - 관련 주제: [enterprise-policy-rag](https://github.com/cyson21/enterprise-policy-rag) — LLM 호출 정책과 권한 기반 검색 비교.
 - 최신 제출 파일: [이력서 PDF](https://cyson21.github.io/downloads/resume.pdf) · [경력기술서 PDF](https://cyson21.github.io/downloads/career-description.pdf).
