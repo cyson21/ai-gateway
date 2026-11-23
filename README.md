@@ -2,9 +2,9 @@
 
 [![CI](https://github.com/cyson21/ai-gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/cyson21/ai-gateway/actions/workflows/ci.yml)
 
-여러 서비스가 OpenAI나 Anthropic을 각자 호출하는 대신, 이 게이트웨이 하나를 거쳐 호출하게 만든 Java 21, Spring WebFlux 프로젝트입니다. 인증, 사용량 제한, 비용, 캐시, 장애 대응을 한곳에서 처리합니다. 설계부터 구현, 테스트까지 혼자 진행한 개인 프로젝트입니다.
+조직별 호출 한도, 캐시, 모델 전환 정책을 구현한 Spring WebFlux 프로토타입입니다. 기본 설정은 테스트용 모델 두 개를 사용하며, 첫 모델 실패 시 다음 후보로 넘어가는 흐름을 테스트합니다.
 
-[포트폴리오](https://cyson21.github.io/projects/ai-gateway/) · [이력서](https://cyson21.github.io/downloads/resume.pdf)
+[기본 모델 설정](backend/src/main/java/com/example/gateway/config/GatewayPipelineConfig.java) · [폴백 테스트](backend/src/test/java/com/example/gateway/resilience/FallbackChainTest.java)
 
 ## 왜 만들었나
 
@@ -33,7 +33,7 @@ Auth → Quota → Guardrail → Cache → Router → Dispatch → Fallback → 
 
 기본 실행과 테스트는 Java 21, Spring Boot WebFlux, 메모리 저장소, 가짜 모델과 가짜 임베딩으로 돌아갑니다. 네트워크 없이 항상 같은 결과가 나옵니다.
 
-Redis, PostgreSQL, pgvector, 실제 모델 연동은 설정을 켜면 동작하도록 따로 분리해 두었습니다. 운영 환경에서 쓴 것은 아닙니다.
+저장소에는 Redis와 PostgreSQL·pgvector용 구성과 코드가 있습니다. 모델 공급자는 테스트용 구현을 사용합니다.
 
 ## 구조
 
@@ -111,11 +111,4 @@ npm test
 - 기본 캐시, 사용량 제한, 배치, 요청 기록은 메모리에 있어서 재시작하면 사라집니다.
 - PostgreSQL, Redis, Nginx Compose는 구성이 맞는지만 확인했습니다. 대규모 부하, 고가용성, 실제 과금 연동은 해 보지 않았습니다.
 
-## 관련 프로젝트와 공개 자료
-
-이 저장소의 코드·실행·테스트는 이 저장소에서 관리합니다. [웹 포트폴리오의 프로젝트 설명](https://cyson21.github.io/projects/ai-gateway/)에서 구현 근거를, [공개 웹사이트](https://cyson21.github.io/)에서 전체 공개 자료를 확인할 수 있습니다.
-
-- 관련 주제: [enterprise-policy-rag](https://github.com/cyson21/enterprise-policy-rag) — LLM 호출 정책과 권한 기반 검색 비교.
-- 최신 제출 파일: [이력서 PDF](https://cyson21.github.io/downloads/resume.pdf) · [경력기술서 PDF](https://cyson21.github.io/downloads/career-description.pdf).
-
-위 관련 저장소는 별도로 실행하는 개인 프로젝트입니다. 서로의 서비스를 순서대로 띄우거나 실제 API·메시지로 연결한 E2E 체인이 구현됐다는 의미는 아닙니다. 구현·검증 범위가 바뀌면 이 README와 웹 프로젝트 문안을 함께 확인합니다.
+[웹 포트폴리오에서 프로젝트 상세 보기](https://cyson21.github.io/projects/ai-gateway/)
